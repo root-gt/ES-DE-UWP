@@ -99,13 +99,29 @@ function Assert-True([bool]$condition, [string]$description) {
 # --------------------------------------------------------------------------------------
 # Installation.
 
-New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Appx" -Force | Out-Null
-Set-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Appx" AllowAllTrustedApps 1 -Type DWord
-Set-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Appx" AllowDevelopmentWithoutDevLicense 1 -Type DWord
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$isAdmin = ([Security.Principal.WindowsPrincipal]$identity).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+Write-Host "Running as $($identity.Name), administrator: $isAdmin"
+Write-Host "OS: $((Get-CimInstance Win32_OperatingSystem).Caption) $([Environment]::OSVersion.Version)"
+
+# Sideloading of trusted packages is allowed by default on current Windows versions, the
+# policy is only set in case it isn't.
+try {
+    New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Appx" -Force -ErrorAction Stop | Out-Null
+    Set-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Appx" AllowAllTrustedApps 1 -Type DWord -ErrorAction Stop
+} catch {
+    Write-Host "Couldn't set the sideloading policy (continuing): $($_.Exception.Message)"
+}
 
 $certificate = Get-ChildItem $Dist -Filter *.cer | Select-Object -First 1
-Import-Certificate -FilePath $certificate.FullName -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
-Import-Certificate -FilePath $certificate.FullName -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
+foreach ($store in @("Cert:\LocalMachine\TrustedPeople", "Cert:\LocalMachine\Root", "Cert:\CurrentUser\TrustedPeople")) {
+    try {
+        Import-Certificate -FilePath $certificate.FullName -CertStoreLocation $store -ErrorAction Stop | Out-Null
+        Write-Host "Certificate imported into $store"
+    } catch {
+        Write-Host "Couldn't import the certificate into ${store}: $($_.Exception.Message)"
+    }
+}
 
 $package = Get-ChildItem $Dist -File | Where-Object { $_.Extension -in ".msix", ".appx" } | Select-Object -First 1
 $dependencies = @(Get-ChildItem "$Dist\Dependencies" -File -ErrorAction SilentlyContinue | ForEach-Object FullName)

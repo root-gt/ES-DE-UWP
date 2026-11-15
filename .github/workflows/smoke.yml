@@ -1,0 +1,55 @@
+#  ES-DE UWP smoke test: installs the MSIX built by the UWP workflow on a Windows runner and
+#  starts it (see uwp/ci/smoke-test.ps1). It runs after every UWP build, and can be started
+#  manually for the package of an earlier run, to test changes to the smoke test itself
+#  without rebuilding.
+
+name: UWP smoke test
+
+on:
+  workflow_call:
+    inputs:
+      artifact-run-id:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      artifact-run-id:
+        description: ID of the UWP workflow run that built the package
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  smoke:
+    name: Install and start ES-DE
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download MSIX
+        uses: actions/download-artifact@v4
+        with:
+          name: ES-DE-UWP-x64
+          path: dist
+          run-id: ${{ inputs.artifact-run-id }}
+          github-token: ${{ github.token }}
+
+      - name: Smoke test
+        shell: pwsh
+        run: ./uwp/ci/smoke-test.ps1 -Dist dist -Output smoke
+
+      - name: Upload smoke test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test
+          path: smoke/
+          if-no-files-found: ignore
