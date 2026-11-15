@@ -1074,6 +1074,14 @@ namespace Utils
 #endif
             }
             catch (std::filesystem::filesystem_error& error) {
+#if defined(ES_UWP)
+                // UWP applications can't inspect the directories above their own data folders,
+                // such as C:\Users, so access errors are expected for those.
+                if (error.code() == std::errc::permission_denied) {
+                    LOG(LogDebug) << "FileSystemUtil::isSymlink(): " << error.what();
+                    return false;
+                }
+#endif
                 LOG(LogError) << "FileSystemUtil::isSymlink(): " << error.what();
                 return false;
             }

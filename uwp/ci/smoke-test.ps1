@@ -19,7 +19,11 @@ $ErrorActionPreference = "Stop"
 $Output = (New-Item -ItemType Directory -Force $Output).FullName
 $failures = New-Object System.Collections.Generic.List[string]
 
+# Takes a screenshot and returns the number of distinct colors and the mean brightness of a
+# 64x48 downscaled copy, to detect a black or blank window. A 320x240 thumbnail is written to
+# the log as base64, so the result can be seen without downloading the artifact.
 function Save-Screenshot([string]$name) {
+    $stats = @{ Colors = 0; Brightness = 0 }
     try {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing
         $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
@@ -27,11 +31,40 @@ function Save-Screenshot([string]$name) {
         $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
         $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
         $bitmap.Save("$Output\$name.png", [System.Drawing.Imaging.ImageFormat]::Png)
-        $graphics.Dispose(); $bitmap.Dispose()
-        Write-Host "Screenshot: $name.png ($($bounds.Width)x$($bounds.Height))"
+
+        $small = New-Object System.Drawing.Bitmap 64, 48
+        $smallGraphics = [System.Drawing.Graphics]::FromImage($small)
+        $smallGraphics.DrawImage($bitmap, 0, 0, 64, 48)
+        $colors = New-Object 'System.Collections.Generic.HashSet[int]'
+        $sum = 0.0
+        for ($y = 0; $y -lt 48; $y++) {
+            for ($x = 0; $x -lt 64; $x++) {
+                $pixel = $small.GetPixel($x, $y)
+                [void]$colors.Add($pixel.ToArgb())
+                $sum += ($pixel.R + $pixel.G + $pixel.B) / 3.0
+            }
+        }
+        $stats.Colors = $colors.Count
+        $stats.Brightness = [math]::Round($sum / (64 * 48), 1)
+
+        $thumbnail = New-Object System.Drawing.Bitmap 320, 240
+        $thumbnailGraphics = [System.Drawing.Graphics]::FromImage($thumbnail)
+        $thumbnailGraphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $thumbnailGraphics.DrawImage($bitmap, 0, 0, 320, 240)
+        $stream = New-Object System.IO.MemoryStream
+        $thumbnail.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
+        Write-Host "THUMBNAIL-BEGIN $name"
+        Write-Host ([Convert]::ToBase64String($stream.ToArray()))
+        Write-Host "THUMBNAIL-END $name"
+
+        foreach ($object in @($stream, $thumbnailGraphics, $thumbnail, $smallGraphics, $small, $graphics, $bitmap)) {
+            $object.Dispose()
+        }
+        Write-Host "Screenshot: $name.png ($($bounds.Width)x$($bounds.Height)), $($stats.Colors) colors, brightness $($stats.Brightness)"
     } catch {
         Write-Host "Couldn't take screenshot: $_"
     }
+    return $stats
 }
 
 function Find-Log([string]$localState) {
@@ -65,7 +98,7 @@ function Start-ESDE([string]$pfn, [string]$localState, [string]$name) {
     }
     # Let it render a few seconds before checking that it's still alive.
     Start-Sleep -Seconds 8
-    Save-Screenshot $name
+    $screenshot = Save-Screenshot $name
     $running = [bool](Get-Process ES-DE -ErrorAction SilentlyContinue)
 
     $log = Find-Log $localState
@@ -75,7 +108,7 @@ function Start-ESDE([string]$pfn, [string]$localState, [string]$name) {
         Get-Content $log | Write-Host
         Write-Host "-------------------"
     }
-    return @{ Log = $log; Started = $started; Running = $running }
+    return @{ Log = $log; Started = $started; Running = $running; Screenshot = $screenshot }
 }
 
 function Assert-Log($result, [string]$name, [string]$pattern, [string]$description) {
@@ -158,6 +191,7 @@ Assert-Log $first "first start" "Setting up Direct3D 12" "Direct3D 12 renderer s
 Assert-Log $first "first start" "Direct3D 12 adapter" "Direct3D 12 device created"
 Assert-True ($first.Started) "first start: startup completed"
 Assert-True ($first.Running) "first start: ES-DE still running after startup"
+Assert-True ($first.Screenshot.Colors -ge 8) "first start: the screen shows rendered content ($($first.Screenshot.Colors) colors)"
 Get-Process ES-DE -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Seconds 2
 
@@ -194,6 +228,7 @@ Assert-Log $second "RomM" "RomM self-test: Imported" "library import"
 Assert-Log $second "RomM" "RomM self-test: PASSED" "game download and ZIP extraction"
 Assert-True ($second.Started) "RomM: startup completed with the imported games"
 Assert-True ($second.Running) "RomM: ES-DE still running after startup"
+Assert-True ($second.Screenshot.Colors -ge 16) "RomM: the screen shows the theme ($($second.Screenshot.Colors) colors)"
 
 $sfc = "$esHome\ROMs\snes\Super Metroid (USA).sfc"
 Assert-True ((Test-Path $sfc) -and (Get-Item $sfc).Length -eq 1048576) "RomM: extracted game has the expected size"
