@@ -79,7 +79,7 @@ No **Developer PowerShell for VS 2022**, na raiz do repositório:
 
 ```powershell
 cmake -S uwp -B build-uwp -G "Visual Studio 17 2022" -A x64 `
-      -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 `
+      "-DCMAKE_SYSTEM_NAME=WindowsStore" "-DCMAKE_SYSTEM_VERSION=10.0" `
       -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
       -DVCPKG_TARGET_TRIPLET=x64-uwp
 ```
