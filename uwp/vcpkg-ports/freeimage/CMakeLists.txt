@@ -115,29 +115,10 @@ target_link_libraries(FreeImage ${ZLIB_LIBRARIES}
 
 target_compile_definitions(FreeImage PRIVATE ${PNG_DEFINITIONS})
 
-# FreeImagePlus
-file(GLOB FREEIMAGEPLUS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Wrapper/FreeImagePlus/src/*.cpp)
-add_library(FreeImagePlus
-    ${FREEIMAGEPLUS_SOURCES}
-    ${CMAKE_CURRENT_SOURCE_DIR}/Wrapper/FreeImagePlus/FreeImagePlus.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Wrapper/FreeImagePlus/FreeImagePlus.rc)
+# ES-DE UWP overlay: FreeImagePlus is not built, its Windows wrapper uses GDI and the
+# clipboard, which UWP applications can't use, and ES-DE only uses the C API.
 
-if(BUILD_SHARED_LIBS)
-    target_compile_definitions(FreeImagePlus PRIVATE -DFIP_EXPORTS)
-else()
-    target_compile_definitions(FreeImagePlus PRIVATE -DFREEIMAGE_LIB)
-endif()
-
-target_include_directories(FreeImagePlus PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Wrapper/FreeImagePlus
-                                                 ${CMAKE_CURRENT_BINARY_DIR}
-                                                 ${REAL_SOURCE_DIR}
-                                                 PUBLIC $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-
-target_link_libraries(FreeImagePlus PUBLIC FreeImage)
-
-list(APPEND PUBLIC_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/Wrapper/FreeImagePlus/FreeImagePlus.h)
-
-install(TARGETS FreeImage FreeImagePlus
+install(TARGETS FreeImage
         EXPORT freeimage-targets
         COMPONENT runtime
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
