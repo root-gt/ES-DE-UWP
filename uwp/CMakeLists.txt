@@ -139,7 +139,8 @@ FetchContent_MakeAvailable(harfbuzz)
 
 add_library(harfbuzz STATIC ${harfbuzz_SOURCE_DIR}/src/harfbuzz.cc)
 target_include_directories(harfbuzz PUBLIC ${harfbuzz_SOURCE_DIR}/src)
-target_compile_definitions(harfbuzz PRIVATE HAVE_FREETYPE)
+# The vcpkg FreeType port renames FT_FaceRec::generic for UWP (0003-Fix-UWP.patch).
+target_compile_definitions(harfbuzz PRIVATE HAVE_FREETYPE generic=GenericFromFreeTypeLibrary)
 target_compile_options(harfbuzz PRIVATE /bigobj /utf-8 /wd4244 /wd4267)
 target_link_libraries(harfbuzz PUBLIC Freetype::Freetype)
 add_library(harfbuzz::harfbuzz ALIAS harfbuzz)
