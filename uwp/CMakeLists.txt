@@ -137,10 +137,18 @@ FetchContent_Declare(harfbuzz
     SOURCE_SUBDIR do-not-add)
 FetchContent_MakeAvailable(harfbuzz)
 
-add_library(harfbuzz STATIC ${harfbuzz_SOURCE_DIR}/src/harfbuzz.cc)
+# The vcpkg FreeType port renames FT_FaceRec::generic to GenericFromFreeTypeLibrary for UWP
+# (0003-Fix-UWP.patch), defining and undefining a "generic" macro around the struct. So the
+# macro is defined again after FreeType has been included, for HarfBuzz's hb-ft.cc.
+file(WRITE ${CMAKE_BINARY_DIR}/harfbuzz-uwp.cc [=[
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#define generic GenericFromFreeTypeLibrary
+#include "harfbuzz.cc"
+]=])
+add_library(harfbuzz STATIC ${CMAKE_BINARY_DIR}/harfbuzz-uwp.cc)
 target_include_directories(harfbuzz PUBLIC ${harfbuzz_SOURCE_DIR}/src)
-# The vcpkg FreeType port renames FT_FaceRec::generic for UWP (0003-Fix-UWP.patch).
-target_compile_definitions(harfbuzz PRIVATE HAVE_FREETYPE generic=GenericFromFreeTypeLibrary)
+target_compile_definitions(harfbuzz PRIVATE HAVE_FREETYPE)
 target_compile_options(harfbuzz PRIVATE /bigobj /utf-8 /wd4244 /wd4267)
 target_link_libraries(harfbuzz PUBLIC Freetype::Freetype)
 add_library(harfbuzz::harfbuzz ALIAS harfbuzz)
