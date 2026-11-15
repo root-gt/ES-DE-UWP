@@ -146,6 +146,10 @@ Write-Host "Installed $($app.PackageFullName)"
 Write-Host "Install location: $($app.InstallLocation)"
 (Get-ChildItem $app.InstallLocation | Select-Object Name, Length | Format-Table -AutoSize | Out-String) | Write-Host
 
+$catalogs = @(Get-ChildItem "$($app.InstallLocation)\resources\locale" -Recurse -Filter *.mo -ErrorAction SilentlyContinue)
+Assert-True ($catalogs.Count -ge 20) "package contains the translation catalogs ($($catalogs.Count) .mo files)"
+Assert-True (Test-Path "$($app.InstallLocation)\themes\linear-es-de\theme.xml") "package contains the bundled themes"
+
 # --------------------------------------------------------------------------------------
 # First start without any configuration.
 

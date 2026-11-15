@@ -198,21 +198,33 @@ endif()
 #---------------------------------------------------------------------------------------------------
 # Localization message catalogs (optional, requires msgfmt from gettext).
 
+# The .mo files are required, ES-DE won't start without the catalog of the selected language.
+# GNU msgfmt is used if it's installed, otherwise uwp/tools/msgfmt.py (Python standard library
+# only, gives the same catalogs).
 find_program(MSGFMT_BINARY msgfmt
              HINTS ${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/gettext/bin)
+find_package(Python3 COMPONENTS Interpreter)
 if(MSGFMT_BINARY)
-    file(GLOB PO_FILES ${ES_ROOT}/locale/po/*.po)
-    foreach(PO_FILE ${PO_FILES})
-        get_filename_component(PO_BASENAME ${PO_FILE} NAME_WE)
-        file(MAKE_DIRECTORY ${ES_ROOT}/resources/locale/${PO_BASENAME}/LC_MESSAGES)
-        execute_process(COMMAND ${MSGFMT_BINARY} -c -o
-                        ${ES_ROOT}/resources/locale/${PO_BASENAME}/LC_MESSAGES/${PO_BASENAME}.mo
-                        ${PO_FILE})
-    endforeach()
+    set(MSGFMT_COMMAND ${MSGFMT_BINARY} -c)
+elseif(Python3_Interpreter_FOUND)
+    set(MSGFMT_COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/msgfmt.py)
 else()
-    message(WARNING "msgfmt not found, translations will only be included if the .mo files "
-                    "already exist in resources/locale")
+    message(FATAL_ERROR "Neither msgfmt nor Python 3 was found, one of them is needed to "
+                        "compile the translations in locale/po")
 endif()
+message(STATUS "Compiling translations with: ${MSGFMT_COMMAND}")
+file(GLOB PO_FILES ${ES_ROOT}/locale/po/*.po)
+foreach(PO_FILE ${PO_FILES})
+    get_filename_component(PO_BASENAME ${PO_FILE} NAME_WE)
+    file(MAKE_DIRECTORY ${ES_ROOT}/resources/locale/${PO_BASENAME}/LC_MESSAGES)
+    execute_process(COMMAND ${MSGFMT_COMMAND} -o
+                    ${ES_ROOT}/resources/locale/${PO_BASENAME}/LC_MESSAGES/${PO_BASENAME}.mo
+                    ${PO_FILE}
+                    RESULT_VARIABLE MSGFMT_RESULT OUTPUT_QUIET)
+    if(NOT MSGFMT_RESULT EQUAL 0)
+        message(FATAL_ERROR "Couldn't compile ${PO_FILE}")
+    endif()
+endforeach()
 
 #---------------------------------------------------------------------------------------------------
 # Package content: manifest, logos, resources, themes and the dependency DLLs.
