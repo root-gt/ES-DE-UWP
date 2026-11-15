@@ -28,14 +28,6 @@
     "freetype",
     "gettext-libintl",
     "icu",
-    {
-      "name": "libgit2",
-      "default-features": false,
-      "features": [
-        "openssl",
-        "pcre"
-      ]
-    },
     "pugixml",
     "sdl2",
     "zlib"

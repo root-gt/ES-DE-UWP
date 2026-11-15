@@ -1,0 +1,46 @@
+diff --git a/Source/FreeImage/Plugin.cpp b/Source/FreeImage/Plugin.cpp
+index 0119ba7..2cf71b5 100644
+--- a/Source/FreeImage/Plugin.cpp
++++ b/Source/FreeImage/Plugin.cpp
+@@ -38,6 +38,13 @@
+ #include "FreeImageIO.h"
+ #include "Plugin.h"
+ 
++// ES-DE UWP overlay: external plugins (DLLs) can't be loaded by UWP applications.
++#if defined(_WIN32) && defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
++#define FREEIMAGE_UWP 1
++#else
++#define FREEIMAGE_UWP 0
++#endif
++
+ #include "../Metadata/FreeImageTag.h"
+ 
+ // =====================================================================
+@@ -282,7 +289,7 @@ FreeImage_Initialise(BOOL load_local_plugins_only) {
+ 			
+ 			// external plugin initialization
+ 
+-#ifdef _WIN32
++#if defined(_WIN32) && !FREEIMAGE_UWP
+ 			if (!load_local_plugins_only) {
+ 				int count = 0;
+ 				char buffer[MAX_PATH + 200];
+@@ -521,6 +528,10 @@ FreeImage_RegisterLocalPlugin(FI_InitProc proc_address, const char *format, cons
+ #ifdef _WIN32
+ FREE_IMAGE_FORMAT DLL_CALLCONV
+ FreeImage_RegisterExternalPlugin(const char *path, const char *format, const char *description, const char *extension, const char *regexpr) {
++#if FREEIMAGE_UWP
++	// UWP applications can't load arbitrary DLLs.
++	(void)path; (void)format; (void)description; (void)extension; (void)regexpr;
++#else
+ 	if (path != NULL) {
+ 		HINSTANCE instance = LoadLibrary(path);
+ 
+@@ -536,6 +547,7 @@ FreeImage_RegisterExternalPlugin(const char *path, const char *format, const cha
+ 		}
+ 	}
+ 
++#endif
+ 	return FIF_UNKNOWN;
+ }
+ #endif // _WIN32

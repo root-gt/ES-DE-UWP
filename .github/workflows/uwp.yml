@@ -105,9 +105,9 @@ jobs:
         id: vcpkg
         shell: pwsh
         run: |
-          # libgit2 is optional (theme downloader). If it, or a dependency only it needs,
-          # fails to build for UWP, ES-DE is built without the theme downloader.
-          $optional = @("libgit2", "pcre", "http-parser")
+          # Ports that may fail without stopping the build (none at the moment; libgit2 isn't
+          # used for UWP as it relies on Win32 desktop APIs, so there's no theme downloader).
+          $optional = @()
           $overlayArgs = @()
           if (Test-Path uwp/vcpkg-ports) { $overlayArgs += "--overlay-ports=$PWD\uwp\vcpkg-ports" }
           if (Test-Path uwp/vcpkg-triplets) { $overlayArgs += "--overlay-triplets=$PWD\uwp\vcpkg-triplets" }
