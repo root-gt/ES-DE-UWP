@@ -16,6 +16,13 @@
 #include <sys/time.h>
 #endif
 
+#if defined(ES_UWP)
+// UWP applications can't use some of the Win32 functions that CImg uses for its Windows
+// support, see the ES_UWP changes in external/CImg/CImg.h. None of that functionality
+// (external process calls, file dates, ImageMagick/GraphicsMagick path lookups) is used.
+#define cimg_no_system_calls
+#endif
+
 #if defined(__IOS__)
 #define cimg_no_system_calls
 #endif

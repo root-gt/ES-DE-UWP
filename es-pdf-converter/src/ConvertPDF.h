@@ -16,9 +16,18 @@
 class ConvertPDF
 {
 public:
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_UWP)
     static int processFile(
         const std::wstring path, const std::wstring mode, int pageNum, int width, int height);
+#elif defined(ES_UWP)
+    // On UWP the converter is linked into the application as it can't be started as a
+    // separate process. The output is returned in the result string.
+    static int processFile(const std::string path,
+                           const std::string mode,
+                           int pageNum,
+                           int width,
+                           int height,
+                           std::string& result);
 #elif defined(__ANDROID__) || defined(__IOS__)
     __attribute__((visibility("default"))) static int processFile(const std::string path,
                                                                   const std::string mode,

@@ -33,6 +33,9 @@
 #include "utils/LocalizationUtil.h"
 #include "utils/PlatformUtil.h"
 #include "utils/StringUtil.h"
+#if defined(ES_UWP)
+#include "utils/PlatformUtilUWP.h"
+#endif
 #include "views/ViewController.h"
 
 #include <SDL2/SDL_events.h>
@@ -97,7 +100,7 @@ namespace
 
 } // namespace
 
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_UWP)
 // As we link using the WINDOWS subsystem there is no console allocated on application startup.
 // As such we'll attempt to attach to a parent console, and if this fails it probably means we've
 // not been started from the command line. In this case there is no need to redirect anything.
@@ -608,7 +611,13 @@ int main(int argc, char* argv[])
     system(chmodCommand.c_str());
 #endif
 
-#if defined(_WIN64)
+#if defined(ES_UWP)
+    // There are no command line arguments or environment variables for UWP applications,
+    // so set the home directory to E:\ (if writable) or the LocalState folder, which places
+    // the application data in E:\ES-DE as with other Xbox Dev Mode frontends.
+    Utils::FileSystem::setHomePath(Utils::Platform::UWP::getDefaultHomePath());
+    std::cout << "UWP home directory: " << Utils::FileSystem::getHomePath() << "\n";
+#elif defined(_WIN64)
     // If we've been started from a console then redirect the standard streams there.
     outputToConsole();
 #endif
@@ -620,7 +629,9 @@ int main(int argc, char* argv[])
             arguments.emplace_back(argv[i]);
 #if defined(_WIN64)
         if (!parseArguments(arguments)) {
+#if !defined(ES_UWP)
             FreeConsole();
+#endif
             return 0;
         }
 #else
@@ -750,7 +761,9 @@ int main(int argc, char* argv[])
             std::cout << "System directories successfully created" << std::endl;
         LOG(LogInfo) << "ES-DE cleanly shutting down";
 #if defined(_WIN64)
+#if !defined(ES_UWP)
         FreeConsole();
+#endif
 #endif
         return 0;
     }
@@ -1318,7 +1331,9 @@ int main(int argc, char* argv[])
     LOG(LogInfo) << "ES-DE cleanly shutting down";
 
 #if defined(_WIN64)
+#if !defined(ES_UWP)
     FreeConsole();
+#endif
 #endif
 
 #if defined(__IOS__)

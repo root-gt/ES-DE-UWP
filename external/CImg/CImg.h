@@ -190,6 +190,13 @@
 #include <process.h>
 #include <io.h>
 enum {FALSE_WIN = 0};
+#if defined(ES_UWP)
+// ES-DE UWP build: these Win32 functions are not available to UWP applications. They are
+// only used to locate external programs (ImageMagick, GraphicsMagick etc.) which can't be
+// started from a UWP application anyway, so failing stubs are sufficient.
+inline DWORD SearchPathA(LPCSTR, LPCSTR, LPCSTR, DWORD, LPSTR, LPSTR*) { return 0; }
+inline BOOL SHGetSpecialFolderPathA(HWND, LPSTR, int, BOOL) { return FALSE; }
+#endif
 #endif
 
 // Look for C++11 features.
@@ -5997,7 +6004,7 @@ namespace cimg_library {
         delete[] ncommand;
         return out_val;
       } else return -1;
-#elif cimg_OS==2
+#elif cimg_OS==2 && !defined(ES_UWP)
       PROCESS_INFORMATION pi;
       STARTUPINFOA si;
       std::memset(&pi,0,sizeof(PROCESS_INFORMATION));
@@ -6273,6 +6280,8 @@ namespace cimg_library {
     inline void srand(cimg_uint64 *const p_rng) {
 #if cimg_OS==1 || defined(__BORLANDC__)
       *p_rng = cimg::time() + (cimg_uint64)getpid();
+#elif cimg_OS==2 && defined(ES_UWP)
+      *p_rng = cimg::time() + (cimg_uint64)GetCurrentProcessId();
 #elif cimg_OS==2
       *p_rng = cimg::time() + (cimg_uint64)_getpid();
 #else
@@ -7529,7 +7538,7 @@ namespace cimg_library {
     // Convert filename as a Windows-style filename (short path name).
     inline void winformat_string(char *const str) {
       if (str && *str) {
-#if cimg_OS==2
+#if cimg_OS==2 && !defined(ES_UWP)
         char *const nstr = new char[MAX_PATH];
         if (GetShortPathNameA(str,nstr,MAX_PATH)) std::strcpy(str,nstr);
         delete[] nstr;
@@ -7705,7 +7714,7 @@ namespace cimg_library {
       int res = -1;
       if (!path || !*path) { _cimg_fdate_err(); return -1; }
       cimg::mutex(6);
-#if cimg_OS==2
+#if cimg_OS==2 && !defined(ES_UWP)
       HANDLE file = CreateFileA(path,GENERIC_READ,0,0,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,0);
       if (file!=INVALID_HANDLE_VALUE) {
         FILETIME _ft;

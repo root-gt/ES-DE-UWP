@@ -741,9 +741,18 @@ namespace Utils
 
 #if defined(_WIN64)
             std::wstring resolvedW;
+#if defined(ES_UWP)
+            CREATEFILE2_EXTENDED_PARAMETERS parameters {};
+            parameters.dwSize = sizeof(parameters);
+            parameters.dwFileFlags = FILE_FLAG_BACKUP_SEMANTICS;
+            HANDLE hFile = CreateFile2(Utils::String::stringToWideString(genericPath).c_str(),
+                                       FILE_READ_ATTRIBUTES, FILE_SHARE_READ, OPEN_EXISTING,
+                                       &parameters);
+#else
             HANDLE hFile = CreateFileW(Utils::String::stringToWideString(genericPath).c_str(),
                                        FILE_READ_ATTRIBUTES, FILE_SHARE_READ, 0, OPEN_EXISTING,
                                        FILE_FLAG_BACKUP_SEMANTICS, 0);
+#endif
             if (hFile != INVALID_HANDLE_VALUE) {
                 resolvedW.resize(
                     GetFinalPathNameByHandleW(hFile, nullptr, 0, FILE_NAME_NORMALIZED) + 1);

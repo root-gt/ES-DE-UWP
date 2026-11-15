@@ -59,6 +59,11 @@ void FindRules::loadFindRules()
 #elif defined(__linux__)
     filePath =
         ResourceManager::getInstance().getResourcePath(":/systems/linux/es_find_rules.xml", false);
+#elif defined(ES_UWP)
+    // The UWP build uses the Windows es_systems.xml file, but with its own find rules where
+    // the emulators are launched using URI protocol activation.
+    filePath =
+        ResourceManager::getInstance().getResourcePath(":/systems/uwp/es_find_rules.xml", false);
 #elif defined(_WIN64)
     filePath = ResourceManager::getInstance().getResourcePath(":/systems/windows/es_find_rules.xml",
                                                               false);
@@ -134,7 +139,10 @@ void FindRules::loadFindRules()
                                     << emulatorName << "\", skipping entry";
                     continue;
                 }
-#if defined(_WIN64)
+#if defined(ES_UWP)
+                if (ruleType != "uwpprotocol" && ruleType != "systempath" &&
+                    ruleType != "staticpath") {
+#elif defined(_WIN64)
                 if (ruleType != "winregistrypath" && ruleType != "winregistryvalue" &&
                     ruleType != "systempath" && ruleType != "staticpath") {
 #elif defined(__ANDROID__)
@@ -154,7 +162,10 @@ void FindRules::loadFindRules()
                         emulatorRules.systemPaths.emplace_back(entryValue);
                     else if (ruleType == "staticpath")
                         emulatorRules.staticPaths.emplace_back(entryValue);
-#if defined(_WIN64)
+#if defined(ES_UWP)
+                    else if (ruleType == "uwpprotocol")
+                        emulatorRules.uwpProtocols.emplace_back(entryValue);
+#elif defined(_WIN64)
                     else if (ruleType == "winregistrypath")
                         emulatorRules.winRegistryPaths.emplace_back(entryValue);
                     else if (ruleType == "winregistryvalue")
@@ -168,6 +179,9 @@ void FindRules::loadFindRules()
             mEmulators[emulatorName] = emulatorRules;
             emulatorRules.systemPaths.clear();
             emulatorRules.staticPaths.clear();
+#if defined(ES_UWP)
+            emulatorRules.uwpProtocols.clear();
+#endif
 #if defined(_WIN64)
             emulatorRules.winRegistryPaths.clear();
             emulatorRules.winRegistryValues.clear();

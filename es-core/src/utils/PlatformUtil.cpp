@@ -18,7 +18,10 @@
 #include "Window.h"
 #if defined(_WIN64)
 #include "utils/StringUtil.h"
+#if !defined(ES_UWP)
 #include <SDL2/SDL_opengl.h>
+#include <shellapi.h>
+#endif
 #endif
 
 #include <SDL2/SDL.h>
@@ -41,7 +44,7 @@ namespace Utils
     {
         int runRebootCommand()
         {
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(ES_UWP)
             return 0;
 #elif defined(_WIN64)
             return system("shutdown -r -t 0");
@@ -56,7 +59,7 @@ namespace Utils
 
         int runPoweroffCommand()
         {
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(ES_UWP)
             return 0;
 #elif defined(_WIN64)
             return system("shutdown -s -t 0");
@@ -71,7 +74,7 @@ namespace Utils
 
         int runSuspendCommand()
         {
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(ES_UWP)
             return 0;
 #elif defined(_WIN64)
             return system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0");
@@ -104,7 +107,7 @@ namespace Utils
 
         int runSystemCommand(const std::wstring& cmd_utf16)
         {
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_UWP)
             STARTUPINFOW si {};
             PROCESS_INFORMATION pi;
 
@@ -270,7 +273,7 @@ namespace Utils
                               bool runInBackground,
                               bool hideWindow)
         {
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_UWP)
             STARTUPINFOW si {};
             PROCESS_INFORMATION pi;
 
@@ -373,7 +376,7 @@ namespace Utils
 
         unsigned int getTaskbarState()
         {
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_UWP)
             APPBARDATA barData;
             barData.cbSize = sizeof(APPBARDATA);
             return static_cast<UINT>(SHAppBarMessage(ABM_GETSTATE, &barData));
@@ -384,7 +387,7 @@ namespace Utils
 
         void hideTaskbar()
         {
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_UWP)
             APPBARDATA barData;
             barData.cbSize = sizeof(APPBARDATA);
             barData.lParam = ABS_AUTOHIDE;
@@ -394,7 +397,7 @@ namespace Utils
 
         void revertTaskbarState(unsigned int& state)
         {
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_UWP)
             APPBARDATA barData;
             barData.cbSize = sizeof(APPBARDATA);
             barData.lParam = state;

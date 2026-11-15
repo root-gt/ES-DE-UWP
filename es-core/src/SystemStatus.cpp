@@ -31,7 +31,7 @@
 #include <SystemConfiguration/SCNetworkConfiguration.h>
 #endif
 
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_UWP)
 // clang-format off
 // Because of course building fails if the files are included in the "wrong" order.
 #include <windows.h>
@@ -215,7 +215,7 @@ void SystemStatus::getStatusBluetooth()
     if (getBluetoothStatus() == 1)
         hasBluetooth = true;
 
-#elif defined(_WIN64)
+#elif defined(_WIN64) && !defined(ES_UWP)
     BLUETOOTH_FIND_RADIO_PARAMS btFindRadio {sizeof(BLUETOOTH_FIND_RADIO_PARAMS)};
     HANDLE btRadio {nullptr};
     BLUETOOTH_RADIO_INFO btInfo {sizeof(BLUETOOTH_RADIO_INFO), 0};
@@ -280,7 +280,7 @@ void SystemStatus::getStatusWifi()
         CFRelease(interfaces);
     }
 
-#elif defined(_WIN64)
+#elif defined(_WIN64) && !defined(ES_UWP)
     PIP_ADAPTER_INFO pAdapterInfo {nullptr};
     PIP_ADAPTER_INFO pAdapter {nullptr};
     ULONG ulOutBufLen {sizeof(IP_ADAPTER_INFO)};
@@ -411,7 +411,7 @@ void SystemStatus::getStatusBattery()
     if (sourceList != nullptr)
         CFRelease(sourceList);
 
-#elif defined(_WIN64)
+#elif defined(_WIN64) && !defined(ES_UWP)
     SYSTEM_POWER_STATUS powerStatus;
 
     if (GetSystemPowerStatus(&powerStatus)) {

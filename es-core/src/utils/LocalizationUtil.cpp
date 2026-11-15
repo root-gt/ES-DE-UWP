@@ -265,9 +265,16 @@ namespace Utils
             else
                 localeTemp = locale;
 
+#if defined(ES_UWP)
+            // SetThreadLocale() is not available to UWP applications, but libintl also
+            // uses the LANGUAGE environment variable which takes precedence.
+            (void)localeTemp;
+            _putenv_s("LANGUAGE", locale.c_str());
+#else
             sLocaleID = LocaleNameToLCID(Utils::String::stringToWideString(localeTemp).c_str(),
                                          LOCALE_ALLOW_NEUTRAL_NAMES);
             SetThreadLocale(sLocaleID);
+#endif
 #else
             setenv("LANGUAGE", std::string {locale + ".UTF-8"}.c_str(), 1);
             setenv("LANG", std::string {locale + ".UTF-8"}.c_str(), 1);
@@ -299,10 +306,12 @@ namespace Utils
             // to make every single translation from the main thread that we want to use in any
             // child threads.
 
+#if !defined(ES_UWP)
             if (sLocaleID == 0)
                 return;
 
             SetThreadLocale(sLocaleID);
+#endif
         }
 #endif
 

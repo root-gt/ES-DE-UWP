@@ -15,7 +15,7 @@
 #include <alsa/asoundlib.h>
 #include <fcntl.h>
 #include <unistd.h>
-#elif defined(_WIN64)
+#elif defined(_WIN64) && !defined(ES_UWP)
 #include <Windows.h>
 #include <endpointvolume.h>
 #include <mmdeviceapi.h>
@@ -40,7 +40,7 @@ public:
     snd_mixer_t* mixerHandle;
     snd_mixer_elem_t* mixerElem;
     snd_mixer_selem_id_t* mixerSelemId;
-#elif defined(_WIN64)
+#elif defined(_WIN64) && !defined(ES_UWP)
     HMIXER mixerHandle;
     MIXERCONTROL mixerControl;
     IAudioEndpointVolume* endpointVolume;

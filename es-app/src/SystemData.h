@@ -41,6 +41,13 @@ public:
 
     void loadFindRules();
 
+#if defined(ES_UWP)
+    const std::vector<std::string>& getUWPProtocols(const std::string& emulator)
+    {
+        return mEmulators[emulator].uwpProtocols;
+    }
+#endif
+
 private:
     struct EmulatorRules {
 #if defined(_WIN64)
@@ -51,6 +58,10 @@ private:
 #endif
         std::vector<std::string> systemPaths;
         std::vector<std::string> staticPaths;
+#if defined(ES_UWP)
+        // URI templates for launching UWP emulators via protocol activation.
+        std::vector<std::string> uwpProtocols;
+#endif
     };
 
     struct CoreRules {

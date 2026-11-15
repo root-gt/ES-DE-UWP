@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ES-DE UWP package manifest. CMake generates Package.appxmanifest from this file.
+
+    The esde protocol is required: emulators activate esde: when they exit
+    (launchOnExit=esde:), which brings ES-DE back to the foreground.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap mp rescap">
+
+  <Identity
+    Name="@UWP_PACKAGE_NAME@"
+    Publisher="@UWP_PUBLISHER@"
+    Version="@UWP_PACKAGE_VERSION@" />
+
+  <mp:PhoneIdentity
+    PhoneProductId="6d1f0d3e-7a43-4c43-9a8e-4d3e1b7b5e21"
+    PhonePublisherId="00000000-0000-0000-0000-000000000000" />
+
+  <Properties>
+    <DisplayName>ES-DE</DisplayName>
+    <PublisherDisplayName>@UWP_PUBLISHER_DISPLAY_NAME@</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+    <TargetDeviceFamily Name="Windows.Xbox" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="ESDE.App">
+      <uap:VisualElements
+        DisplayName="ES-DE"
+        Description="ES-DE Frontend"
+        BackgroundColor="#101010"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square310x310Logo="Assets\Square310x310Logo.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#101010" />
+      </uap:VisualElements>
+      <Extensions>
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="esde">
+            <uap:DisplayName>ES-DE</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Scraping, theme downloads and RomM servers on the internet. -->
+    <Capability Name="internetClient" />
+    <!-- RomM servers on the local network. -->
+    <Capability Name="privateNetworkClientServer" />
+    <!-- ROMs and media on USB drives. -->
+    <uap:Capability Name="removableStorage" />
+    <!-- Access to E:\ and other locations outside of the package. -->
+    <rescap:Capability Name="broadFileSystemAccess" />
+    <!-- Run as a game title on Xbox (more memory and GPU time). -->
+    <rescap:Capability Name="expandedResources" />
+  </Capabilities>
+</Package>

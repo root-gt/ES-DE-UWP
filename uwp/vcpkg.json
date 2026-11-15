@@ -1,0 +1,39 @@
+{
+  "name": "es-de-uwp",
+  "version-string": "3.4.1",
+  "description": "ES-DE Frontend, UWP (Xbox Dev Mode) build",
+  "license": "MIT",
+  "supports": "uwp",
+  "dependencies": [
+    {
+      "name": "curl",
+      "default-features": false,
+      "features": [ "schannel" ]
+    },
+    {
+      "name": "ffmpeg",
+      "default-features": false,
+      "features": [ "avcodec", "avdevice", "avfilter", "avformat", "swresample", "swscale" ]
+    },
+    "freeimage",
+    "freetype",
+    "gettext-libintl",
+    "harfbuzz",
+    "icu",
+    "libgit2",
+    "pugixml",
+    "sdl2",
+    "zlib"
+  ],
+  "features": {
+    "pdf": {
+      "description": "PDF manual support using Poppler (GPL licensed, linked into the application)",
+      "dependencies": [
+        {
+          "name": "poppler",
+          "default-features": false
+        }
+      ]
+    }
+  }
+}

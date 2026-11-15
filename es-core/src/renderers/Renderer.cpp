@@ -11,9 +11,16 @@
 #include "ImageIO.h"
 #include "Log.h"
 #include "Settings.h"
+#include "resources/ResourceManager.h"
+
+#include <SDL2/SDL.h>
+
+#if defined(USE_D3D12_RENDERER)
+#include "renderers/RendererD3D12.h"
+#else
 #include "renderers/RendererOpenGL.h"
 #include "renderers/ShaderOpenGL.h"
-#include "resources/ResourceManager.h"
+#endif
 
 #if defined(__ANDROID__)
 #include "utils/PlatformUtilAndroid.h"
@@ -25,8 +32,12 @@
 
 Renderer* Renderer::getInstance()
 {
+#if defined(USE_D3D12_RENDERER)
+    return RendererD3D12::getInstance();
+#else
     static RendererOpenGL instance;
     return &instance;
+#endif
 }
 
 void Renderer::setIcon()
@@ -97,9 +108,11 @@ bool Renderer::createWindow()
     SDL_GetDesktopDisplayMode(displayIndex, &displayMode);
 
 #if defined(_WIN64)
+#if !defined(ES_UWP)
     // Tell Windows that we're DPI aware so that we can set a physical resolution and
     // avoid any automatic DPI scaling.
     SetProcessDPIAware();
+#endif
     // We need to set the resolution based on the actual display bounds as the numbers
     // returned by SDL_GetDesktopDisplayMode are calculated based on DPI scaling and
     // therefore do not necessarily reflect the physical display resolution.
@@ -245,6 +258,14 @@ bool Renderer::createWindow()
         windowFlags = SDL_WINDOW_OPENGL;
 #endif
 
+#if defined(USE_D3D12_RENDERER)
+    // The Direct3D 12 renderer creates its own swap chain for the window.
+    windowFlags &= ~static_cast<unsigned int>(SDL_WINDOW_OPENGL);
+#if defined(__WINRT__)
+    windowFlags |= SDL_WINDOW_FULLSCREEN;
+#endif
+#endif
+
     if ((mSDLWindow = SDL_CreateWindow("ES-DE", SDL_WINDOWPOS_UNDEFINED_DISPLAY(displayIndex),
                                        SDL_WINDOWPOS_UNDEFINED_DISPLAY(displayIndex), mWindowWidth,
                                        mWindowHeight, windowFlags)) == nullptr) {
@@ -326,7 +347,11 @@ bool Renderer::createWindow()
         LOG(LogInfo) << "Screen mode: fullscreen";
     }
 
+#if defined(USE_D3D12_RENDERER)
+    LOG(LogInfo) << "Setting up Direct3D 12...";
+#else
     LOG(LogInfo) << "Setting up OpenGL...";
+#endif
 
     if (!createContext())
         return false;

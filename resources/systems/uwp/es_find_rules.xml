@@ -1,0 +1,122 @@
+<?xml version="1.0"?>
+<!--
+    ES-DE UWP (Xbox Dev Mode) find rules.
+
+    UWP applications can't start other processes, so emulators are launched by activating
+    their URI protocol. The systems configuration is shared with Windows (es_systems.xml from
+    resources/systems/windows) and the %EMULATOR_<NAME>% variables are resolved by the
+    "uwpprotocol" rules below.
+
+    Template variables for uwpprotocol entries:
+      %ARGS%       The emulator arguments from es_systems.xml (everything after the
+                   %EMULATOR_<NAME>% variable), URL-encoded.
+      %ARGSRAW%    The same arguments without URL encoding.
+      %RETURNURI%  The URL-encoded ES-DE protocol (esde:). The emulator activates it when it
+                   exits, which brings ES-DE back to the foreground.
+
+    Note that & in the template has to be written as &amp; in this XML file.
+
+    These rules can be overridden or extended in ES-DE/custom_systems/es_find_rules.xml.
+    The first matching emulator entry wins and the custom file is read first.
+
+    Core paths prefixed with "uwp:" are inside the emulator's application package. They
+    can't be accessed by ES-DE, so they are passed to the emulator without checking
+    whether the file exists.
+-->
+<ruleList>
+    <!-- RetroArch UWP. Protocol format verified against uwp/uwp_main.cpp in RetroArch:
+         retroarch:?cmd=<command line>&launchOnExit=<URI to activate on exit> -->
+    <emulator name="RETROARCH">
+        <rule type="uwpprotocol">
+            <entry>retroarch:?cmd=retroarch %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <core name="RETROARCH">
+        <rule type="corepath">
+            <entry>uwp:cores</entry>
+        </rule>
+    </core>
+
+    <!-- Standalone UWP emulators. These use the same "?cmd=<command line>" convention as
+         RetroArch, as used by the Xbox Dev Mode ports of these emulators. If an emulator
+         uses another protocol name or format, override the rule in
+         custom_systems/es_find_rules.xml. -->
+    <emulator name="DOLPHIN">
+        <rule type="uwpprotocol">
+            <entry>dolphin:?cmd=dolphin.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="TRIFORCE">
+        <rule type="uwpprotocol">
+            <entry>dolphin:?cmd=dolphin.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="PCSX2">
+        <!-- XBSX2 is the Xbox port of PCSX2. -->
+        <rule type="uwpprotocol">
+            <entry>xbsx2:?cmd=xbsx2.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="PPSSPP">
+        <rule type="uwpprotocol">
+            <entry>ppsspp:?cmd=ppsspp.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="DUCKSTATION">
+        <rule type="uwpprotocol">
+            <entry>duckstation:?cmd=duckstation.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="FLYCAST">
+        <rule type="uwpprotocol">
+            <entry>flycast:?cmd=flycast.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="CEMU">
+        <rule type="uwpprotocol">
+            <entry>cemu:?cmd=cemu.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="XEMU">
+        <rule type="uwpprotocol">
+            <entry>xemu:?cmd=xemu.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="XENIA">
+        <rule type="uwpprotocol">
+            <entry>xeniacanary:?cmd=xeniacanary.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="AZAHAR">
+        <rule type="uwpprotocol">
+            <entry>azahar:?cmd=azahar.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="CITRA">
+        <!-- The Citra based UWP port is called Citrara. -->
+        <rule type="uwpprotocol">
+            <entry>citrara:?cmd=citrara.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="LIME3DS">
+        <rule type="uwpprotocol">
+            <entry>azahar:?cmd=azahar.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="SUPERMODEL">
+        <rule type="uwpprotocol">
+            <entry>supermodel:?cmd=supermodel.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <!-- Unverified protocol names, adjust if needed. -->
+    <emulator name="RPCS3">
+        <rule type="uwpprotocol">
+            <entry>rpcs3:?cmd=rpcs3.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+    <emulator name="SHADPS4">
+        <rule type="uwpprotocol">
+            <entry>shadps4:?cmd=shadps4.exe %ARGS%&amp;launchOnExit=%RETURNURI%</entry>
+        </rule>
+    </emulator>
+</ruleList>

@@ -23,6 +23,9 @@
 #include "Window.h"
 #include "utils/FileSystemUtil.h"
 #include "utils/PlatformUtil.h"
+#if defined(ES_UWP)
+#include "utils/PlatformUtilUWP.h"
+#endif
 #include "utils/TimeUtil.h"
 #include "views/GamelistView.h"
 #include "views/ViewController.h"
@@ -950,6 +953,46 @@ const FileData::SortType& FileData::getSortTypeFromString(const std::string& des
     return FileSorts::SortTypes.at(0);
 }
 
+#if defined(ES_UWP)
+namespace
+{
+    // Launches a game on UWP. The command either starts with the protocol marker that
+    // findEmulator() put in place of the %EMULATOR_ variable, or it's a plain URI.
+    int launchGameUWP(const std::string& commandArg)
+    {
+        const std::string command {Utils::String::trim(commandArg)};
+        const std::string& marker {Utils::Platform::UWP::sProtocolMarker};
+
+        if (command.compare(0, marker.size(), marker) == 0) {
+            const size_t spacePos {command.find(' ')};
+            const std::string emulatorName {command.substr(
+                marker.size(),
+                spacePos == std::string::npos ? std::string::npos : spacePos - marker.size())};
+            const std::string arguments {
+                spacePos == std::string::npos ? "" : command.substr(spacePos + 1)};
+
+            const std::vector<std::string>& protocols {
+                SystemData::sFindRules.get()->getUWPProtocols(emulatorName)};
+            if (protocols.empty()) {
+                LOG(LogError) << "No uwpprotocol find rule for emulator \"" << emulatorName
+                              << "\"";
+                return 1;
+            }
+            LOG(LogDebug) << "FileData::launchGame(): Emulator arguments: " << arguments;
+            return Utils::Platform::UWP::launchURI(
+                Utils::Platform::UWP::buildLaunchURI(protocols.front(), arguments));
+        }
+
+        if (Utils::Platform::UWP::isURIScheme(command))
+            return Utils::Platform::UWP::launchURI(command);
+
+        LOG(LogError) << "UWP applications can't start executables, use an uwpprotocol find "
+                         "rule or an URI as the launch command";
+        return 1;
+    }
+} // namespace
+#endif
+
 void FileData::launchGame()
 {
     Window* window {Window::getInstance()};
@@ -1068,6 +1111,13 @@ void FileData::launchGame()
     // The global setting always applies.
     if (Settings::getInstance()->getBool("RunInBackground"))
         runInBackground = true;
+#endif
+
+#if defined(ES_UWP)
+    // The emulator is started via protocol activation and ES-DE is suspended by the OS while
+    // the emulator runs, so ES-DE always "runs in the background". The emulator activates
+    // the esde: protocol when exiting, which brings ES-DE back to the foreground.
+    runInBackground = true;
 #endif
 
 #if !defined(_WIN64)
@@ -1526,8 +1576,20 @@ void FileData::launchGame()
 #endif
             }
 
+#if defined(ES_UWP)
+            bool uwpCorePath {false};
+            if (coreFile.compare(0, 4, "uwp:") == 0) {
+                // The core is inside the emulator's application package (e.g. the RetroArch
+                // cores directory) which can't be accessed, so it's not checked.
+                coreFile = coreFile.substr(4);
+                uwpCorePath = true;
+            }
+            if (uwpCorePath || Utils::FileSystem::isRegularFile(coreFile) ||
+                Utils::FileSystem::isSymlink(coreFile)) {
+#else
             if (Utils::FileSystem::isRegularFile(coreFile) ||
                 Utils::FileSystem::isSymlink(coreFile)) {
+#endif
                 foundCoreFile = true;
                 // Escape any blankspaces.
                 if (coreFile.find(" ") != std::string::npos)
@@ -2176,7 +2238,10 @@ void FileData::launchGame()
     Settings::getInstance()->setInt(
         "GameLaunchTime", static_cast<int>(Utils::Time::DateTime(Utils::Time::now()).getTime()));
 
-#if defined(_WIN64)
+#if defined(ES_UWP)
+    (void)hideWindow;
+    returnValue = launchGameUWP(command);
+#elif defined(_WIN64)
     returnValue = Utils::Platform::launchGameWindows(
         Utils::String::stringToWideString(command),
         Utils::String::stringToWideString(startDirectory), runInBackground, hideWindow);
@@ -2301,6 +2366,9 @@ const std::pair<std::string, FileData::findEmulatorResult> FileData::findEmulato
     std::vector<std::string> emulatorWinRegistryPaths;
     std::vector<std::string> emulatorWinRegistryValues;
 #endif
+#if defined(ES_UWP)
+    std::vector<std::string> emulatorUWPProtocols;
+#endif
 #if defined(__ANDROID__)
     std::vector<std::string> emulatorAndroidPackages;
 #endif
@@ -2339,10 +2407,16 @@ const std::pair<std::string, FileData::findEmulatorResult> FileData::findEmulato
         emulatorSystemPaths = SystemData::sFindRules.get()->mEmulators[emulatorEntry].systemPaths;
 
         emulatorStaticPaths = SystemData::sFindRules.get()->mEmulators[emulatorEntry].staticPaths;
+#if defined(ES_UWP)
+        emulatorUWPProtocols = SystemData::sFindRules.get()->mEmulators[emulatorEntry].uwpProtocols;
+#endif
     }
 
     // Error handling in case of no emulator find rule.
-#if defined(_WIN64)
+#if defined(ES_UWP)
+    if (emulatorEntry != "" && emulatorUWPProtocols.empty() && emulatorSystemPaths.empty() &&
+        emulatorStaticPaths.empty())
+#elif defined(_WIN64)
     if (emulatorEntry != "" && emulatorWinRegistryPaths.empty() &&
         emulatorWinRegistryValues.empty() && emulatorSystemPaths.empty() &&
         emulatorStaticPaths.empty())
@@ -2354,7 +2428,20 @@ const std::pair<std::string, FileData::findEmulatorResult> FileData::findEmulato
 #endif
         return std::make_pair(emulatorEntry, FileData::findEmulatorResult::NO_RULES);
 
-#if defined(_WIN64)
+#if defined(ES_UWP)
+    // UWP applications can't start other processes, so emulators are launched by activating
+    // their URI protocol. The emulator is replaced with a marker that is processed in
+    // launchGame() where the URI is built from the template in the find rule.
+    if (!emulatorUWPProtocols.empty()) {
+        LOG(LogDebug) << "FileData::findEmulator(): " << (preCommand ? "Pre-command" : "Emulator")
+                      << " found via uwpprotocol rule";
+        exePath = Utils::Platform::UWP::sProtocolMarker + emulatorEntry;
+        command.replace(startPos, endPos - startPos + 1, exePath);
+        return std::make_pair(exePath, FileData::findEmulatorResult::FOUND_FILE);
+    }
+#endif
+
+#if defined(_WIN64) && !defined(ES_UWP)
     for (std::string& path : emulatorWinRegistryPaths) {
         // Search for the emulator using the App Paths keys in the Windows Registry.
         const std::string& registryKeyPath {
@@ -2504,7 +2591,11 @@ const std::pair<std::string, FileData::findEmulatorResult> FileData::findEmulato
 #endif
 
     for (std::string& path : emulatorSystemPaths) {
-#if defined(_WIN64)
+#if defined(ES_UWP)
+        (void)path;
+        LOG(LogDebug) << "FileData::findEmulator(): systempath rules are not supported on UWP";
+        break;
+#elif defined(_WIN64)
         std::wstring pathWide {Utils::String::stringToWideString(path)};
         // Search for the emulator using the PATH environment variable.
         DWORD size {SearchPathW(nullptr, pathWide.c_str(), L".exe", 0, nullptr, nullptr)};
@@ -2615,7 +2706,12 @@ const std::pair<std::string, FileData::findEmulatorResult> FileData::findEmulato
         }
     }
 
-#if defined(_WIN64)
+#if defined(ES_UWP)
+    // On UWP a launch command without an %EMULATOR_ variable can be a URI that is activated
+    // as-is, for example "xboxgamelist:%BASENAME%" or "microsoft-edge:https://...".
+    if (Utils::Platform::UWP::isURIScheme(emuExecutable))
+        exePath = emuExecutable;
+#elif defined(_WIN64)
     std::wstring emuExecutableWide {Utils::String::stringToWideString(emuExecutable)};
     // Search for the emulator using the PATH environment variable.
     const DWORD size {

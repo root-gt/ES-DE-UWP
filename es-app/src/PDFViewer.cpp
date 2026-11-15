@@ -17,11 +17,17 @@
 
 #include <array>
 
-#if defined(_WIN64)
+// On Android, iOS and UWP the PDF converter is linked as a library, on the other
+// platforms it's a separate binary that is started as a child process.
+#if defined(__ANDROID__) || defined(__IOS__) || defined(ES_UWP)
+#define ES_PDF_LIBRARY
+#endif
+
+#if defined(_WIN64) && !defined(ES_PDF_LIBRARY)
 #include <windows.h>
 #endif
 
-#if defined(__ANDROID__) || defined(__IOS__)
+#if defined(ES_PDF_LIBRARY)
 #include "ConvertPDF.h"
 #endif
 
@@ -56,15 +62,15 @@ bool PDFViewer::startPDFViewer(FileData* game)
 {
     ViewController::getInstance()->pauseViewVideos();
 
-#if !defined(__ANDROID__) && !defined(__IOS__)
-#if defined(_WIN64)
+#if !defined(ES_PDF_LIBRARY)
+#if defined(_WIN64) && !defined(ES_PDF_LIBRARY)
     const std::string convertBinary {"/es-pdf-converter/es-pdf-convert.exe"};
 #else
     const std::string convertBinary {"/es-pdf-convert"};
 #endif
     mESConvertPath = Utils::FileSystem::getExePath() + convertBinary;
     if (!Utils::FileSystem::exists(mESConvertPath)) {
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_PDF_LIBRARY)
         LOG(LogError) << "Couldn't find PDF conversion binary es-pdf-convert.exe";
 #else
         LOG(LogError) << "Couldn't find PDF conversion binary es-pdf-convert";
@@ -73,7 +79,7 @@ bool PDFViewer::startPDFViewer(FileData* game)
         ViewController::getInstance()->startViewVideos();
         return false;
     }
-#endif // !__ANDROID__
+#endif // !ES_PDF_LIBRARY
 
     mGame = game;
     mManualPath = mGame->getManualPath();
@@ -224,7 +230,7 @@ bool PDFViewer::getDocumentInfo()
 {
     std::string commandOutput;
 
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_PDF_LIBRARY)
     std::wstring command {
         Utils::String::stringToWideString(Utils::FileSystem::getEscapedPath(mESConvertPath))};
     command.append(L" -fileinfo ")
@@ -302,7 +308,7 @@ bool PDFViewer::getDocumentInfo()
     // Close process and thread handles.
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
-#elif defined(__ANDROID__) || defined(__IOS__)
+#elif defined(ES_PDF_LIBRARY)
     if (ConvertPDF::processFile(mManualPath, "-fileinfo", 0, 0, 0, commandOutput) == -1)
         return false;
 #else
@@ -353,7 +359,7 @@ void PDFViewer::convertPage(int pageNum)
     mConversionTime = 0;
 
     if (mPages[pageNum].imageData.empty()) {
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_PDF_LIBRARY)
         std::wstring command {
             Utils::String::stringToWideString(Utils::FileSystem::getEscapedPath(mESConvertPath))};
         command.append(L" -convert ")
@@ -379,14 +385,14 @@ void PDFViewer::convertPage(int pageNum)
 
 #if (DEBUG_PDF_CONVERSION)
         LOG(LogDebug) << "Converting page: " << mCurrentPage;
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_PDF_LIBRARY)
         LOG(LogDebug) << Utils::String::wideStringToString(command);
 #else
         LOG(LogDebug) << command;
 #endif
 #endif
         std::string imageData;
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_PDF_LIBRARY)
         STARTUPINFOW si {};
         PROCESS_INFORMATION pi;
         HANDLE childStdoutRead {nullptr};
@@ -446,7 +452,7 @@ void PDFViewer::convertPage(int pageNum)
         CloseHandle(childStdoutRead);
         WaitForSingleObject(pi.hThread, INFINITE);
         WaitForSingleObject(pi.hProcess, INFINITE);
-#elif (__ANDROID__) || defined(__IOS__)
+#elif defined(ES_PDF_LIBRARY)
         ConvertPDF::processFile(mManualPath, "-convert", pageNum,
                                 static_cast<int>(mPages[pageNum].width),
                                 static_cast<int>(mPages[pageNum].height), imageData);
@@ -472,10 +478,10 @@ void PDFViewer::convertPage(int pageNum)
         returnValue = pclose(commandPipe);
 #endif
         const size_t imageDataSize {mPages[pageNum].imageData.size()};
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_PDF_LIBRARY)
         if (!processReturnValue || (static_cast<int>(imageDataSize) <
                                     mPages[pageNum].width * mPages[pageNum].height * 4)) {
-#elif defined(__ANDROID__) || defined(__IOS__)
+#elif defined(ES_PDF_LIBRARY)
         if (static_cast<int>(imageDataSize) < mPages[pageNum].width * mPages[pageNum].height * 4) {
 #else
         if (returnValue != 0 || (static_cast<int>(imageDataSize) <

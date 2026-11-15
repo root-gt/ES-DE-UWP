@@ -16,6 +16,7 @@
 #include "poppler-page.h"
 
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 
@@ -29,10 +30,10 @@
 #include <windows.h>
 #endif
 
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_UWP)
 int ConvertPDF::processFile(
     const std::wstring path, const std::wstring mode, int pageNum, int width, int height)
-#elif defined(__ANDROID__) || defined(__IOS__)
+#elif defined(__ANDROID__) || defined(__IOS__) || defined(ES_UWP)
 int ConvertPDF::processFile(const std::string path,
                             const std::string mode,
                             int pageNum,
@@ -46,7 +47,12 @@ int ConvertPDF::processFile(
 {
     std::ifstream file;
 
+#if defined(ES_UWP)
+    // The path is UTF-8 encoded.
+    file.open(std::filesystem::u8path(path), std::ifstream::binary);
+#else
     file.open(path.c_str(), std::ifstream::binary);
+#endif
     if (file.fail()) {
 #if defined(__ANDROID__)
         __android_log_print(ANDROID_LOG_ERROR, ANDROID_APPLICATION_ID,
@@ -78,7 +84,7 @@ int ConvertPDF::processFile(
     }
 
     const int pageCount {document->pages()};
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_UWP)
     if (mode == L"-fileinfo") {
 #else
     if (mode == "-fileinfo") {
@@ -120,7 +126,7 @@ int ConvertPDF::processFile(
             pageInfo.emplace_back(pageRow);
         }
         for (auto& row : pageInfo) {
-#if defined(__ANDROID__) || defined(__IOS__)
+#if defined(__ANDROID__) || defined(__IOS__) || defined(ES_UWP)
             result.append(row).append("\n");
 #else
             std::cout << row << std::endl;
@@ -176,7 +182,7 @@ int ConvertPDF::processFile(
         return (-1);
     }
 
-#if defined(__ANDROID__) || defined(__IOS__)
+#if defined(__ANDROID__) || defined(__IOS__) || defined(ES_UWP)
     result.insert(0, std::move(image.data()), width * height * 4);
 #else
     // Necessary as the image data stream may contain null characters.

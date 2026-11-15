@@ -11,7 +11,7 @@
 #include "Log.h"
 #include "utils/MathUtil.h"
 
-#if defined(_WIN64)
+#if defined(_WIN64) && !defined(ES_UWP)
 #include <cmath>
 #endif
 
@@ -27,7 +27,7 @@ VolumeControl::VolumeControl()
     , mixerHandle {nullptr}
     , mixerElem {nullptr}
     , mixerSelemId {nullptr}
-#elif defined(_WIN64)
+#elif defined(_WIN64) && !defined(ES_UWP)
     : mixerHandle {nullptr}
     , endpointVolume {nullptr}
 #endif
@@ -98,7 +98,7 @@ void VolumeControl::init()
             LOG(LogError) << "VolumeControl::init(): Failed to open ALSA mixer!";
         }
     }
-#elif defined(_WIN64)
+#elif defined(_WIN64) && !defined(ES_UWP)
     // Windows Vista or above.
     if (endpointVolume == nullptr) {
         CoInitialize(nullptr);
@@ -147,7 +147,7 @@ void VolumeControl::deinit()
         mixerHandle = nullptr;
         mixerElem = nullptr;
     }
-#elif defined(_WIN64)
+#elif defined(_WIN64) && !defined(ES_UWP)
     if (endpointVolume != nullptr) {
         endpointVolume->Release();
         endpointVolume = nullptr;
@@ -182,7 +182,7 @@ int VolumeControl::getVolume() const
             LOG(LogError) << "VolumeControl::getVolume(): Failed to get volume range";
         }
     }
-#elif defined(_WIN64)
+#elif defined(_WIN64) && !defined(ES_UWP)
     if (endpointVolume != nullptr) {
         // Windows Vista or above, uses EndpointVolume API.
         float floatVolume = 0.0f; // 0-1
@@ -223,7 +223,7 @@ void VolumeControl::setVolume(int volume)
             LOG(LogError) << "VolumeControl::getVolume(): Failed to get volume range";
         }
     }
-#elif defined(_WIN64)
+#elif defined(_WIN64) && !defined(ES_UWP)
     if (endpointVolume != nullptr) {
         // Windows Vista or above, uses EndpointVolume API.
         float floatVolume = 0.0f; // 0-1
