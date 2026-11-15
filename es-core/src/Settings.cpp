@@ -384,6 +384,9 @@ void Settings::setDefaults()
     mBoolMap["LegacyGamelistFileLocation"] = {false, false};
     mBoolMap["CreatePlaceholderSystemDirectories"] = {false, false};
     mBoolMap["SystemStatusDisplayAll"] = {false, false};
+    // Imports the RomM library and downloads one game on startup, logging the results.
+    // Used by the automated tests of the UWP package, see uwp/ci/smoke-test.ps1.
+    mStringMap["RomMSelfTestGame"] = {"", ""};
     mStringMap["OpenGLVersion"] = {"", ""};
 #if !defined(__ANDROID__) && !defined(__IOS__)
     mStringMap["ROMDirectory"] = {"", ""};

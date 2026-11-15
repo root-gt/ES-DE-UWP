@@ -184,6 +184,23 @@ if(TARGET ${ES_APP_TARGET})
     endif()
 endif()
 
+# Automated tests for the RomM integration, see tests/romm.
+option(ES_BUILD_TESTS "Set to ON to build the es-de-tests executable" OFF)
+if(ES_BUILD_TESTS AND NOT IOS AND NOT ANDROID)
+    set(ES_TEST_SOURCES ${ES_SOURCES})
+    list(FILTER ES_TEST_SOURCES EXCLUDE REGEX "(main\\.cpp|\\.rc)$")
+    add_executable(es-de-tests ${ES_TEST_SOURCES} ${CMAKE_SOURCE_DIR}/tests/romm/RomMTests.cpp)
+    target_link_libraries(es-de-tests ${COMMON_LIBRARIES} ${CMAKE_DL_LIBS} es-core
+                          lunasvg::lunasvg)
+    get_target_property(ES_APP_DEFINITIONS ${ES_APP_TARGET} COMPILE_DEFINITIONS)
+    if(ES_APP_DEFINITIONS)
+        target_compile_definitions(es-de-tests PRIVATE ${ES_APP_DEFINITIONS})
+    endif()
+    if(ZLIB_FOUND)
+        target_link_libraries(es-de-tests ZLIB::ZLIB)
+    endif()
+endif()
+
 # Setup for installation and package generation.
 if(WIN32)
     install(TARGETS ES-DE RUNTIME DESTINATION .)

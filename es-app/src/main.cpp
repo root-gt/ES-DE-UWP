@@ -21,6 +21,7 @@
 #include "MameNames.h"
 #include "MediaViewer.h"
 #include "PDFViewer.h"
+#include "RomM.h"
 #include "Screensaver.h"
 #include "Scripting.h"
 #include "Settings.h"
@@ -1177,6 +1178,9 @@ int main(int argc, char* argv[])
         SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
     }
 #endif
+
+    if (Settings::getInstance()->getString("RomMSelfTestGame") != "")
+        RomM::runSelfTest(Settings::getInstance()->getString("RomMSelfTestGame"));
 
     SystemStatus::getInstance();
     MameNames::getInstance();

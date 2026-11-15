@@ -21,6 +21,7 @@
 
 #include "Settings.h"
 #include "renderers/ShadersD3D12.h"
+#include "utils/StringUtil.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
@@ -215,8 +216,28 @@ bool RendererD3D12::createDevice()
 
     result = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&mDevice));
     if (FAILED(result)) {
-        LOG(LogError) << "D3D12CreateDevice() failed: " << hresultString(result);
-        return false;
+        LOG(LogWarning) << "D3D12CreateDevice() failed for the default adapter: "
+                        << hresultString(result) << ", trying the WARP software adapter";
+        ComPtr<IDXGIAdapter> warpAdapter;
+        result = mFactory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter));
+        if (SUCCEEDED(result))
+            result = D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0,
+                                       IID_PPV_ARGS(&mDevice));
+        if (FAILED(result)) {
+            LOG(LogError) << "D3D12CreateDevice() failed: " << hresultString(result);
+            return false;
+        }
+    }
+
+    {
+        DXGI_ADAPTER_DESC1 adapterDesc {};
+        ComPtr<IDXGIAdapter1> adapter;
+        if (SUCCEEDED(mFactory->EnumAdapterByLuid(mDevice->GetAdapterLuid(),
+                                                  IID_PPV_ARGS(&adapter))) &&
+            SUCCEEDED(adapter->GetDesc1(&adapterDesc))) {
+            LOG(LogInfo) << "Direct3D 12 adapter: "
+                         << Utils::String::wideStringToString(adapterDesc.Description);
+        }
     }
 
     D3D12_COMMAND_QUEUE_DESC queueDesc {};

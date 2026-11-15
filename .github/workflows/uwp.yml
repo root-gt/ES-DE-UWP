@@ -1,0 +1,226 @@
+#  ES-DE UWP (Xbox Dev Mode) build.
+#
+#  tests:  Builds ES-DE on Linux and runs the RomM integration tests against a mock RomM
+#          server, plus the UWP protocol launch tests.
+#  msix:   Builds the UWP package with vcpkg (x64-uwp) and Visual Studio, signs it and
+#          uploads the .msix with its certificate and dependencies. The package is then
+#          installed and started on the runner as a smoke test (Direct3D 12 on WARP).
+#
+#  Signing: if the repository secrets UWP_CERT_PFX_BASE64 and UWP_CERT_PASSWORD are set,
+#  that certificate is used (its subject must be "CN=ES-DE UWP"), so that updates can be
+#  installed over an existing installation. Otherwise a new self-signed certificate is
+#  created for every build.
+
+name: UWP
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: RomM and protocol tests (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake gettext libharfbuzz-dev libicu-dev \
+            libsdl2-dev libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev \
+            libfreeimage-dev libfreetype6-dev libgit2-dev libcurl4-openssl-dev libpugixml-dev \
+            libasound2-dev libbluetooth-dev libgl1-mesa-dev libpoppler-cpp-dev zlib1g-dev
+
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DES_BUILD_TESTS=ON \
+                -DAPPLICATION_UPDATER=OFF
+          cmake --build build --target es-de-tests es-de -j $(nproc)
+
+      - name: UWP protocol tests
+        run: |
+          g++ -std=c++17 -Wall -DES_UWP -DES_UWP_NO_WINRT -Ies-core/src \
+              -Iexternal/utfcpp/source tests/uwp/UWPProtocolTests.cpp \
+              es-core/src/utils/PlatformUtilUWP.cpp es-core/src/utils/StringUtil.cpp \
+              -lpugixml -licui18n -licuuc -o uwp-protocol-tests
+          ./uwp-protocol-tests resources/systems/uwp/es_find_rules.xml
+
+      - name: RomM tests
+        run: |
+          python3 tests/romm/mock_romm.py 8099 2> mock.log &
+          sleep 2
+          mkdir -p "$RUNNER_TEMP/romm-home"
+          ./es-de-tests http://127.0.0.1:8099 "$RUNNER_TEMP/romm-home"
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-test-logs
+          path: |
+            ${{ runner.temp }}/romm-home/ES-DE/logs/
+            mock.log
+          if-no-files-found: ignore
+
+  msix:
+    name: UWP MSIX (x64)
+    runs-on: windows-2022
+    timeout-minutes: 360
+    env:
+      VCPKG_REF: '2026.07.29'
+      VCPKG_DIR: C:\vcpkg-esde
+      VCPKG_INSTALLED: C:\esde-vcpkg-installed
+      VCPKG_CACHE: C:\esde-vcpkg-cache
+      VCPKG_BINARY_SOURCES: clear;files,C:\esde-vcpkg-cache,readwrite
+      VCPKG_DISABLE_METRICS: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up vcpkg
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch $env:VCPKG_REF https://github.com/microsoft/vcpkg $env:VCPKG_DIR
+          & "$env:VCPKG_DIR\bootstrap-vcpkg.bat" -disableMetrics
+          New-Item -ItemType Directory -Force $env:VCPKG_CACHE | Out-Null
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache/restore@v4
+        with:
+          path: C:\esde-vcpkg-cache
+          key: vcpkg-x64-uwp-${{ env.VCPKG_REF }}-${{ hashFiles('uwp/vcpkg.json', 'uwp/vcpkg-ports/**', 'uwp/vcpkg-triplets/**') }}-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-x64-uwp-${{ env.VCPKG_REF }}-${{ hashFiles('uwp/vcpkg.json', 'uwp/vcpkg-ports/**', 'uwp/vcpkg-triplets/**') }}-
+            vcpkg-x64-uwp-${{ env.VCPKG_REF }}-
+
+      - name: Build dependencies (vcpkg x64-uwp)
+        id: vcpkg
+        shell: pwsh
+        run: |
+          $overlayArgs = @()
+          if (Test-Path uwp/vcpkg-ports) { $overlayArgs += "--overlay-ports=$PWD\uwp\vcpkg-ports" }
+          if (Test-Path uwp/vcpkg-triplets) { $overlayArgs += "--overlay-triplets=$PWD\uwp\vcpkg-triplets" }
+          & "$env:VCPKG_DIR\vcpkg.exe" install --triplet x64-uwp --host-triplet x64-windows `
+            --x-manifest-root=uwp --x-install-root=$env:VCPKG_INSTALLED `
+            --allow-unsupported --keep-going @overlayArgs
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+
+      - name: Save vcpkg binary cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: C:\esde-vcpkg-cache
+          key: vcpkg-x64-uwp-${{ env.VCPKG_REF }}-${{ hashFiles('uwp/vcpkg.json', 'uwp/vcpkg-ports/**', 'uwp/vcpkg-triplets/**') }}-${{ github.run_id }}
+
+      - name: Upload vcpkg logs
+        if: failure() && steps.vcpkg.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vcpkg-logs
+          path: |
+            C:\vcpkg-esde\buildtrees\**\*.log
+            C:\vcpkg-esde\buildtrees\**\config.log
+          if-no-files-found: ignore
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          $msgfmt = "C:\Program Files\Git\usr\bin\msgfmt.exe"
+          $msgfmtArg = @()
+          if (Test-Path $msgfmt) { $msgfmtArg += "-DMSGFMT_BINARY=$msgfmt" }
+          cmake -S uwp -B build-uwp -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 `
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_DIR\scripts\buildsystems\vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-uwp -DVCPKG_MANIFEST_INSTALL=OFF `
+            "-DVCPKG_INSTALLED_DIR=$env:VCPKG_INSTALLED" @msgfmtArg
+          if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed" }
+
+      - name: Build and package
+        shell: pwsh
+        run: |
+          cmake --build build-uwp --config Release -- /m /v:minimal `
+            /p:AppxBundle=Never /p:GenerateAppxPackageOnBuild=true `
+            /p:AppxPackageSigningEnabled=false /p:UapAppxPackageBuildMode=SideloadOnly `
+            "/p:AppxPackageDir=$PWD\package\\"
+          if ($LASTEXITCODE -ne 0) { throw "Build failed" }
+          Get-ChildItem package -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
+
+      - name: Sign package
+        shell: pwsh
+        env:
+          UWP_CERT_PFX_BASE64: ${{ secrets.UWP_CERT_PFX_BASE64 }}
+          UWP_CERT_PASSWORD: ${{ secrets.UWP_CERT_PASSWORD }}
+        run: |
+          $out = New-Item -ItemType Directory -Force dist
+          $package = Get-ChildItem package -Recurse -Include *.msix, *.appx |
+            Where-Object { $_.FullName -notmatch '\\Dependencies\\' } | Select-Object -First 1
+          if (-not $package) { throw "No package was produced" }
+
+          if ($env:UWP_CERT_PFX_BASE64) {
+            $pfx = "$env:RUNNER_TEMP\esde.pfx"
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:UWP_CERT_PFX_BASE64))
+            $password = $env:UWP_CERT_PASSWORD
+            $cert = Get-PfxData -FilePath $pfx -Password (ConvertTo-SecureString $password -AsPlainText -Force)
+            $cert = $cert.EndEntityCertificates[0]
+          } else {
+            $password = [Guid]::NewGuid().ToString()
+            $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=ES-DE UWP" `
+              -KeyUsage DigitalSignature -FriendlyName "ES-DE UWP" `
+              -CertStoreLocation Cert:\CurrentUser\My `
+              -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+            $pfx = "$env:RUNNER_TEMP\esde.pfx"
+            Export-PfxCertificate -Cert $cert -FilePath $pfx `
+              -Password (ConvertTo-SecureString $password -AsPlainText -Force) | Out-Null
+          }
+          Export-Certificate -Cert $cert -FilePath "$out\ES-DE_UWP.cer" | Out-Null
+
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          $version = (Select-Xml -Path build-uwp\Package.appxmanifest -Namespace @{m='http://schemas.microsoft.com/appx/manifest/foundation/windows10'} -XPath '//m:Identity').Node.Version
+          $target = "$out\ES-DE_${version}_x64$($package.Extension)"
+          Copy-Item $package.FullName $target
+          & $signtool.FullName sign /fd SHA256 /a /f $pfx /p $password $target
+          if ($LASTEXITCODE -ne 0) { throw "Signing failed" }
+
+          $deps = New-Item -ItemType Directory -Force "$out\Dependencies"
+          Get-ChildItem package -Recurse -Include *.appx, *.msix |
+            Where-Object { $_.FullName -match '\\Dependencies\\x64\\' } |
+            Copy-Item -Destination $deps
+          Copy-Item uwp\README.md "$out\README.md"
+          Get-ChildItem $out -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
+
+      - name: Upload MSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: ES-DE-UWP-x64
+          path: dist/
+
+      - name: Smoke test (install and start on the runner)
+        shell: pwsh
+        run: ./uwp/ci/smoke-test.ps1 -Dist dist -Output smoke
+
+      - name: Upload smoke test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test
+          path: smoke/
+          if-no-files-found: ignore
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.msix
+            dist/*.appx
+            dist/*.cer
+            dist/Dependencies/*

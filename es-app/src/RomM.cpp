@@ -549,6 +549,54 @@ namespace RomM
         return escaped.str();
     }
 
+    bool runSelfTest(const std::string& gamePath)
+    {
+        LOG(LogInfo) << "RomM self-test: Starting";
+        const auto fail = [](const std::string& message) {
+            LOG(LogError) << "RomM self-test: FAILED: " << message;
+            return false;
+        };
+
+        Client client;
+        std::string message;
+        if (!client.testConnection(message))
+            return fail("Connection: " + message);
+        LOG(LogInfo) << "RomM self-test: Connection: " << message;
+
+        std::vector<Platform> platforms;
+        std::string error;
+        if (!client.getPlatforms(platforms, error))
+            return fail("Platforms: " + error);
+        LOG(LogInfo) << "RomM self-test: " << platforms.size() << " platforms";
+
+        Progress progress;
+        ImportStats stats;
+        if (!client.importPlatforms(platforms, progress, stats, error))
+            return fail("Import: " + error);
+        LOG(LogInfo) << "RomM self-test: Imported " << stats.imported << ", updated "
+                     << stats.updated << ", skipped " << stats.skipped << ", failed "
+                     << stats.failed << ", media files " << stats.mediaFiles;
+        if (stats.imported + stats.updated + stats.skipped == 0)
+            return fail("No games were imported");
+
+        std::string romDirectory {FileData::getROMDirectory()};
+        if (!romDirectory.empty() && romDirectory.back() != '/')
+            romDirectory.push_back('/');
+        const std::string path {romDirectory + gamePath};
+        const std::string system {gamePath.substr(0, gamePath.find('/'))};
+        if (!readPlaceholder(path))
+            return fail("\"" + path + "\" is not a RomM placeholder");
+        if (!client.downloadGame(path, system, progress, error))
+            return fail("Download: " + error);
+        if (readPlaceholder(path))
+            return fail("The placeholder was not replaced");
+
+        LOG(LogInfo) << "RomM self-test: Downloaded \"" << path << "\" ("
+                     << Utils::FileSystem::getFileSize(path) << " bytes)";
+        LOG(LogInfo) << "RomM self-test: PASSED";
+        return true;
+    }
+
     std::string formatBytes(long long bytes)
     {
         const char* units[] {"B", "KiB", "MiB", "GiB", "TiB"};

@@ -172,6 +172,11 @@ namespace RomM
                         Progress* progress,
                         std::string& error);
 
+    // Self-test used by the automated tests: imports all mappable platforms from the
+    // configured server and downloads gamePath (relative to the ROM directory). The results
+    // are written to the log, which ends with "RomM self-test: PASSED" or "FAILED".
+    bool runSelfTest(const std::string& gamePath);
+
     // URL encoding of a path segment (RFC 3986 unreserved characters are kept).
     std::string urlEncode(const std::string& string);
 
