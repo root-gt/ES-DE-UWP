@@ -8,7 +8,23 @@ Port próprio do [ES-DE](https://gitlab.com/es-de/emulationstation-de) 3.4.1 par
 
 Já inclui a **integração com o RomM**: importar a biblioteca e baixar o jogo direto para o disco das ROMs no primeiro lançamento. Veja [ROMM.md](../ROMM.md).
 
-> **Status:** este código foi escrito e verificado num ambiente Linux, sem Visual Studio. **Ainda não foi compilado com MSVC nem testado num Xbox.** Leia "O que foi verificado" e "Riscos conhecidos" antes de começar.
+> **Status:** o pacote `.msix` é compilado pelo GitHub Actions (Visual Studio 2022 + vcpkg) e, a cada build, instalado e aberto num Windows de verdade. Lá o ES-DE inicia com o Direct3D 12 e faz a importação e o download de um jogo do RomM dentro do sandbox do UWP. **Ainda não foi testado num Xbox.** Leia "O que é testado" e "Riscos conhecidos".
+
+## Baixar o pacote pronto
+
+Cada push no `main` gera o pacote na aba **Actions** do repositório, workflow **UWP**. Abra a execução mais recente com ✅ e baixe o artifact **ES-DE-UWP-x64**. Ele contém:
+
+| Arquivo | Para quê |
+|---|---|
+| `ES-DE_3.4.1.0_x64.msix` | o app |
+| `ES-DE_UWP.cer` | certificado que assina o pacote |
+| `Dependencies/Microsoft.VCLibs.x64.14.00.appx` | runtime do C++, instale junto se o Device Portal pedir |
+
+Tags `v*` (por exemplo `v3.4.1-uwp1`) também publicam esses arquivos numa Release.
+
+**Certificado:** sem configuração, cada build gera um certificado novo. Para atualizar o app no Xbox sem desinstalar, use sempre o mesmo certificado: crie um `.pfx` com o assunto `CN=ES-DE UWP` (comando na seção "Gerar o pacote") e cadastre dois *secrets* no repositório:
+- `UWP_CERT_PFX_BASE64`: o `.pfx` em base64, gerado com `[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\esde-uwp.pfx"))`;
+- `UWP_CERT_PASSWORD`: a senha do `.pfx`.
 
 ---
 
@@ -22,6 +38,7 @@ Já inclui a **integração com o RomM**: importar a biblioteca e baixar o jogo 
 | Dados (`ES-DE/`) | `%USERPROFILE%\ES-DE` | **`E:\ES-DE`** (ou a pasta `LocalState` do app se `E:` não for gravável) |
 | ROMs | `%USERPROFILE%\ROMs` | **`E:\ROMs`** (configurável no menu) |
 | Manuais PDF | processo `es-pdf-convert.exe` | biblioteca linkada no app (opcional, `ES_UWP_PDF`) |
+| Baixador de temas | sim (libgit2) | **não disponível**: a libgit2 depende de APIs Win32 de desktop. Os temas Linear, Modern e Slate vêm no pacote, e outros podem ser copiados para `E:\ES-DE\themes` |
 | Scripts de evento, reiniciar/desligar o sistema, volume do sistema, status de Bluetooth/Wi-Fi/bateria | sim | desativados (não existem para apps UWP) |
 
 Todo o código específico fica atrás de `#if defined(ES_UWP)` e `USE_D3D12_RENDERER`, então os builds de Linux, Windows e macOS continuam iguais.
@@ -63,13 +80,15 @@ Para mudar ou adicionar emuladores, crie `E:\ES-DE\custom_systems\es_find_rules.
   - "Ferramentas de build do C++ v143";
   - o Windows SDK 10.0.22621 ou mais novo.
 - **CMake 3.21+** (já vem com o VS).
-- **vcpkg**:
+- **vcpkg na versão `2026.07.29`**, a última que ainda tem o FreeImage:
 
   ```powershell
-  git clone https://github.com/microsoft/vcpkg C:\vcpkg
+  git clone --branch 2026.07.29 https://github.com/microsoft/vcpkg C:\vcpkg
   C:\vcpkg\bootstrap-vcpkg.bat
   setx VCPKG_ROOT C:\vcpkg
   ```
+
+- **Python 3** ou o `msgfmt` do gettext, para compilar as traduções (`uwp/tools/msgfmt.py` é usado se o `msgfmt` não existir).
 
 - Um Xbox em Modo Desenvolvedor, com o RetroArch UWP e os outros emuladores que você for usar instalados.
 
@@ -80,11 +99,15 @@ No **Developer PowerShell for VS 2022**, na raiz do repositório:
 ```powershell
 cmake -S uwp -B build-uwp -G "Visual Studio 17 2022" -A x64 `
       "-DCMAKE_SYSTEM_NAME=WindowsStore" "-DCMAKE_SYSTEM_VERSION=10.0" `
-      -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
-      -DVCPKG_TARGET_TRIPLET=x64-uwp
+      "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
+      "-DVCPKG_TARGET_TRIPLET=x64-uwp"
 ```
 
-Na primeira configuração o vcpkg compila todas as dependências listadas em `uwp/vcpkg.json` (curl, FFmpeg, FreeImage, FreeType, HarfBuzz, ICU, libgit2, gettext, pugixml, SDL2, zlib). Isso pode levar mais de uma hora.
+As aspas são necessárias no PowerShell, que quebra argumentos como `-DCMAKE_SYSTEM_VERSION=10.0` em dois.
+
+Na primeira configuração o vcpkg compila as dependências de `uwp/vcpkg.json`: curl (com OpenSSL), FFmpeg, FreeImage, FreeType, ICU, gettext, pugixml, SDL2 e zlib. Isso leva cerca de uma hora. Ajustes para UWP:
+- **FreeImage:** usa o port de `uwp/vcpkg-ports/freeimage` (registrado em `uwp/vcpkg-configuration.json`), sem os plugins EXR e RAW, sem o FreeImagePlus e sem carregar plugins externos (DLLs). OpenEXR e LibRaw não compilam para UWP.
+- **HarfBuzz:** é compilado pelo próprio projeto a partir do arquivo único `harfbuzz.cc`, porque o build do vcpkg (meson) falha no UWP.
 
 Depois:
 
@@ -116,7 +139,12 @@ O Poppler usa licença GPL e, no UWP, fica linkado dentro do app. Por isso o sup
 
    Depois reconfigure o projeto acrescentando `-DUWP_CERTIFICATE=C:/esde-uwp.pfx` ao comando `cmake` de configuração.
 
-2. **Pacote:** no Visual Studio, clique com o botão direito no projeto `ES-DE` e escolha *Publicar* > *Criar Pacotes de Aplicativos* > *Sideloading* > x64 / Release. O resultado é um `.msix` com as DLLs, os temas e os recursos dentro.
+2. **Pacote:** no Visual Studio, clique com o botão direito no projeto `ES-DE` e escolha *Publicar* > *Criar Pacotes de Aplicativos* > *Sideloading* > x64 / Release. O resultado é um `.msix` com as DLLs, os temas e os recursos dentro. Pela linha de comando, como no CI:
+
+   ```powershell
+   cmake --build build-uwp --config Release -- /p:AppxBundle=Never /p:GenerateAppxPackageOnBuild=true `
+         /p:UapAppxPackageBuildMode=SideloadOnly "/p:AppxPackageDir=$PWD\package\\"
+   ```
 3. **Instalar:** abra o Device Portal do Xbox (`https://IP-DO-XBOX:11443`), vá em *Add* e envie o `.msix` e o certificado `.cer`.
    - Outra opção é publicar direto pelo Visual Studio, em *Depurar* > *Máquina Remota* > IP do Xbox.
 4. **No Xbox:** no Dev Home, mude o tipo do app de "App" para **"Game"**, para ter mais memória e GPU.
@@ -133,32 +161,32 @@ O Poppler usa licença GPL e, no UWP, fica linkado dentro do app. Por isso o sup
 
 ---
 
-## O que foi verificado (sem Visual Studio)
+## O que é testado
 
-- **Shaders HLSL:** os 7 shaders (core, blur horizontal e vertical, scanlines) compilam com o compilador HLSL do `glslang`.
-- **Renderizador D3D12:** compila com os headers D3D12/DXGI do MinGW, `-Wall` limpo, tanto no caminho CoreWindow (UWP) quanto no HWND (Win32).
-- **Todos os fontes do ES-DE para Windows:** passaram por uma varredura de sintaxe com MinGW, nas configurações `ES_UWP` + `WINAPI_FAMILY=WINAPI_FAMILY_APP`. A varredura achou e corrigiu usos de APIs Win32 de desktop proibidas no UWP:
-  - `CreateFileW`, `SetThreadLocale`, `GetAdaptersInfo`, `SetProcessDPIAware`;
-  - APIs de console;
-  - `CreateProcessW` (no lançamento de jogos e no conversor de PDF);
-  - funções Win32 usadas pela biblioteca CImg.
+O workflow `.github/workflows/uwp.yml` roda a cada push:
 
-  Restam só 2 erros, os mesmos que o ES-DE original dá nessa checagem, porque o MinGW não tem uma extensão da STL do MSVC.
-- **Build Windows desktop normal:** a mesma varredura sem `ES_UWP` dá exatamente os mesmos erros do ES-DE original, então nada mudou para ele.
-- **Build Linux:** compila e roda. A importação e o download do RomM foram testados num ES-DE de verdade (em tela virtual) contra um servidor RomM simulado.
-- **Montagem da URI de lançamento:** testada e decodificada de volta com um parser de query padrão. Inclui nomes de arquivo com espaços, parênteses e `&`.
+1. **Testes no Linux** (`tests/`):
+   - 62 verificações do RomM contra um servidor RomM simulado (`tests/romm/mock_romm.py`): conexão e token, mapeamento de plataformas, importação com paginação, metadados no `gamelist.xml`, mídia, reimportação sem duplicar, download, extração de ZIP, IDs desatualizados e cancelamento.
+   - 61 verificações das URIs de lançamento, cobrindo as 16 regras `uwpprotocol`. Cada URI é decodificada de volta como o RetroArch faz, e precisa dar o comando original.
+2. **Build do MSIX** com Visual Studio 2022 e vcpkg (`x64-uwp`).
+3. **Smoke test** (`uwp/ci/smoke-test.ps1`) num Windows Server 2022, sem GPU:
+   - instala o `.msix` assinado e confere se as traduções e os temas estão no pacote;
+   - abre o ES-DE e confere no log que o **Direct3D 12** foi inicializado (pelo WARP, o renderizador por software do Windows) e que a inicialização terminou sem o app fechar;
+   - abre de novo com um servidor RomM configurado e a opção oculta `RomMSelfTestGame`. **Dentro do sandbox do UWP**, o ES-DE importa a biblioteca (265 jogos e 540 arquivos de mídia) e baixa e extrai um jogo de um ZIP;
+   - tira capturas de tela, confere que há conteúdo desenhado e guarda os logs e as capturas no artifact `smoke-test`.
+
+O workflow **UWP smoke test** também pode ser disparado à mão na aba Actions, informando o ID de uma execução do UWP, para testar de novo um pacote já compilado.
 
 ## Riscos conhecidos e o que conferir primeiro
 
-1. **SDL2 para UWP no vcpkg.** Se o port `sdl2` do vcpkg não compilar para `x64-uwp`, compile o SDL2 pelo projeto oficial `VisualC-WinRT\SDL-UWP.vcxproj` (ou use o fork do SDL do Dan). Depois aponte `SDL2_DIR` para ele.
-2. **Outras dependências no vcpkg UWP.** FFmpeg, FreeImage, libgit2, ICU e gettext podem precisar de ajustes no vcpkg para UWP. O port do Dan usa essas mesmas bibliotecas como DLLs (`avcodec-62.dll`, `FreeImage.dll`, `git2.dll`, `intl-8.dll`…), o que indica que é possível.
-3. **Protocolos dos emuladores standalone.**
+1. **Xbox.** O pacote foi testado no Windows, não no Xbox. No console, confira principalmente o acesso a `E:\` (a capacidade `broadFileSystemAccess` precisa ser permitida nas configurações de privacidade do app) e a volta do emulador para o ES-DE (`launchOnExit=esde:`).
+2. **Protocolos dos emuladores standalone.**
    - O formato do RetroArch foi verificado no código.
    - Dolphin, XBSX2, PPSSPP, DuckStation, Flycast, Cemu, xemu, Xenia, Azahar e Citra seguem a mesma convenção `?cmd=` dos ports do Dan, mas não foram verificados no código.
    - RPCS3 e shadPS4 têm nomes de protocolo presumidos.
    - Ajuste no `custom_systems/es_find_rules.xml` se algum não abrir.
-4. **Renderizador D3D12.** Ele foi escrito para reproduzir exatamente o OpenGL, incluindo cantos arredondados, recorte, blur do fundo do menu, scanlines e a leitura do fundo para cache. Mas nunca rodou numa GPU de verdade. Se algo aparecer de cabeça para baixo ou com cores trocadas, olhe primeiro `shaderPostprocessing()` em `RendererD3D12.cpp`.
-5. **Rotação de tela de 90°/270°** não é suportada no pós-processamento D3D12. Não faz falta no Xbox.
+3. **Renderizador D3D12 numa GPU de verdade.** No CI ele roda no WARP. Se algo aparecer de cabeça para baixo ou com cores trocadas no Xbox, olhe primeiro `shaderPostprocessing()` em `RendererD3D12.cpp`.
+4. **Rotação de tela de 90°/270°** não é suportada no pós-processamento D3D12. Não faz falta no Xbox.
 
 ## Arquivos do port
 
@@ -169,6 +197,10 @@ O Poppler usa licença GPL e, no UWP, fica linkado dentro do app. Por isso o sup
 | `es-core/src/utils/PlatformUtilUWP.h/.cpp` | Lançamento por URI, pastas, detecção do Xbox (C++/WinRT) |
 | `resources/systems/uwp/es_find_rules.xml` | Regras `uwpprotocol` dos emuladores |
 | `uwp/CMakeLists.txt`, `uwp/vcpkg.json` | Build UWP |
+| `uwp/vcpkg-ports/freeimage/` | Port do FreeImage ajustado para UWP |
+| `uwp/tools/msgfmt.py` | Compila as traduções sem o gettext instalado |
+| `uwp/ci/smoke-test.ps1`, `.github/workflows/` | CI: build, testes e smoke test |
+| `tests/` | Testes do RomM e das URIs de lançamento |
 | `uwp/Package.appxmanifest.in`, `uwp/Assets/` | Manifesto (protocolo `esde:`, capacidades) e ícones |
 | `uwp/src/UWPMain.cpp` | Ponto de entrada (`SDL_WinRTRunApp`) |
 | `uwp/src/ConvertPDFStub.cpp` | Usado quando o suporte a PDF está desligado |
