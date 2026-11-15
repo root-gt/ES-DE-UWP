@@ -231,8 +231,7 @@ function(add_package_content baseDir targetDir)
         endif()
         set_source_files_properties(${file} PROPERTIES
                                     VS_DEPLOYMENT_CONTENT 1
-                                    VS_DEPLOYMENT_LOCATION ${location}
-                                    HEADER_FILE_ONLY TRUE)
+                                    VS_DEPLOYMENT_LOCATION ${location})
         list(APPEND PACKAGE_CONTENT ${file})
     endforeach()
     set(PACKAGE_CONTENT ${PACKAGE_CONTENT} PARENT_SCOPE)
@@ -249,12 +248,10 @@ set(VCPKG_DEBUG_BIN_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/debug/bin
 file(GLOB RELEASE_DLLS ${VCPKG_BIN_DIR}/*.dll)
 file(GLOB DEBUG_DLLS ${VCPKG_DEBUG_BIN_DIR}/*.dll)
 foreach(dll ${RELEASE_DLLS})
-    set_source_files_properties(${dll} PROPERTIES VS_DEPLOYMENT_CONTENT $<NOT:$<CONFIG:Debug>>
-                                                  HEADER_FILE_ONLY TRUE)
+    set_source_files_properties(${dll} PROPERTIES VS_DEPLOYMENT_CONTENT $<NOT:$<CONFIG:Debug>>)
 endforeach()
 foreach(dll ${DEBUG_DLLS})
-    set_source_files_properties(${dll} PROPERTIES VS_DEPLOYMENT_CONTENT $<CONFIG:Debug>
-                                                  HEADER_FILE_ONLY TRUE)
+    set_source_files_properties(${dll} PROPERTIES VS_DEPLOYMENT_CONTENT $<CONFIG:Debug>)
 endforeach()
 
 source_group("Package\\Assets" REGULAR_EXPRESSION "/uwp/Assets/")
