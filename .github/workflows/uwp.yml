@@ -20,6 +20,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  # Releases are published for tags, the smoke test downloads the package artifact.
+  contents: write
+  actions: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
