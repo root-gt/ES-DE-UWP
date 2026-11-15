@@ -103,6 +103,26 @@ if(ES_UWP_PDF)
 endif()
 
 #---------------------------------------------------------------------------------------------------
+# Visual Studio defaults for UWP projects that don't fit this project. They're overridden for
+# all generated projects (ES-DE and the bundled libraries) with a Directory.Build.targets
+# file, which MSBuild imports for every project in the build directory:
+# - C++/CX (/ZW) is off: ES-DE uses C++/WinRT, which is standard C++, and C++/CX reserves
+#   names like "generic" that FreeType uses (FT_Face::generic).
+# - SDL checks (/sdl) are off: they turn deprecation warnings (C4996) into errors.
+
+file(WRITE ${CMAKE_BINARY_DIR}/Directory.Build.targets [=[
+<Project>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <CompileAsWinRT>false</CompileAsWinRT>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>
+]=])
+
+#---------------------------------------------------------------------------------------------------
 # HarfBuzz. The vcpkg port doesn't support UWP (its Meson build fails), so the single-file
 # amalgamation is built here instead. HarfBuzz itself supports UWP (CreateFile2 and
 # MapViewOfFileFromApp in hb-blob.cc). The hash is the one used by the vcpkg port.
