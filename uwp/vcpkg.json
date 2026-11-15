@@ -8,19 +8,34 @@
     {
       "name": "curl",
       "default-features": false,
-      "features": [ "ssl" ]
+      "features": [
+        "ssl"
+      ]
     },
     {
       "name": "ffmpeg",
       "default-features": false,
-      "features": [ "avcodec", "avdevice", "avfilter", "avformat", "swresample", "swscale" ]
+      "features": [
+        "avcodec",
+        "avdevice",
+        "avfilter",
+        "avformat",
+        "swresample",
+        "swscale"
+      ]
     },
     "freeimage",
     "freetype",
     "gettext-libintl",
-    "harfbuzz",
     "icu",
-    "libgit2",
+    {
+      "name": "libgit2",
+      "default-features": false,
+      "features": [
+        "openssl",
+        "pcre"
+      ]
+    },
     "pugixml",
     "sdl2",
     "zlib"

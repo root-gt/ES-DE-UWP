@@ -61,7 +61,6 @@ message(STATUS "ES-DE UWP package version ${UWP_PACKAGE_VERSION}")
 
 find_package(CURL CONFIG REQUIRED)
 find_package(Freetype REQUIRED)
-find_package(harfbuzz CONFIG REQUIRED)
 find_package(ICU REQUIRED COMPONENTS uc i18n data)
 find_package(pugixml CONFIG REQUIRED)
 find_package(SDL2 CONFIG REQUIRED)
@@ -70,15 +69,24 @@ find_package(freeimage CONFIG REQUIRED)
 find_package(Intl REQUIRED)
 find_package(ZLIB REQUIRED)
 
-# libgit2 has used different CMake package names in vcpkg over time.
+# libgit2 is optional, it's only used by the theme downloader. It has used different CMake
+# package names in vcpkg over time.
 find_package(unofficial-git2 CONFIG QUIET)
 find_package(libgit2 CONFIG QUIET)
 if(TARGET unofficial::git2::git2)
     set(GIT2_TARGET unofficial::git2::git2)
 elseif(TARGET libgit2::libgit2package)
     set(GIT2_TARGET libgit2::libgit2package)
+elseif(TARGET libgit2::libgit2)
+    set(GIT2_TARGET libgit2::libgit2)
 else()
-    find_library(GIT2_TARGET NAMES git2 REQUIRED)
+    find_library(GIT2_TARGET NAMES git2)
+endif()
+if(GIT2_TARGET)
+    message(STATUS "libgit2 found, the theme downloader is enabled")
+else()
+    message(WARNING "libgit2 not found, building without the theme downloader")
+    set(GIT2_TARGET "")
 endif()
 
 set(PDF_LIBRARIES "")
@@ -93,6 +101,28 @@ if(ES_UWP_PDF)
         set(PDF_LIBRARIES ${POPPLER_CPP_LIBRARY} ${POPPLER_LIBRARY})
     endif()
 endif()
+
+#---------------------------------------------------------------------------------------------------
+# HarfBuzz. The vcpkg port doesn't support UWP (its Meson build fails), so the single-file
+# amalgamation is built here instead. HarfBuzz itself supports UWP (CreateFile2 and
+# MapViewOfFileFromApp in hb-blob.cc). The hash is the one used by the vcpkg port.
+
+include(FetchContent)
+set(HARFBUZZ_VERSION 14.2.1)
+FetchContent_Declare(harfbuzz
+    URL https://github.com/harfbuzz/harfbuzz/archive/${HARFBUZZ_VERSION}.tar.gz
+    URL_HASH SHA512=b7642a81eb021bf96cf8c91c5ebdde7f4fdfd40c76db722f00cf001125f4b81b954d08485774d2b23318d49b1e954fa0189ba8f10db56d148f33f9d90891d0cb
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    # Only download, HarfBuzz's own build files are not used.
+    SOURCE_SUBDIR do-not-add)
+FetchContent_MakeAvailable(harfbuzz)
+
+add_library(harfbuzz STATIC ${harfbuzz_SOURCE_DIR}/src/harfbuzz.cc)
+target_include_directories(harfbuzz PUBLIC ${harfbuzz_SOURCE_DIR}/src)
+target_compile_definitions(harfbuzz PRIVATE HAVE_FREETYPE)
+target_compile_options(harfbuzz PRIVATE /bigobj /utf-8 /wd4244 /wd4267)
+target_link_libraries(harfbuzz PUBLIC Freetype::Freetype)
+add_library(harfbuzz::harfbuzz ALIAS harfbuzz)
 
 #---------------------------------------------------------------------------------------------------
 # Bundled libraries (built as static libraries to avoid having to deploy additional DLLs).
@@ -118,6 +148,10 @@ file(GLOB_RECURSE APP_HEADERS ${ES_ROOT}/es-app/src/*.h)
 list(FILTER CORE_SOURCES EXCLUDE REGEX "(RendererOpenGL|ShaderOpenGL|PlatformUtilAndroid)\\.cpp$")
 list(FILTER CORE_HEADERS EXCLUDE REGEX "(RendererOpenGL|ShaderOpenGL|PlatformUtilAndroid|BluetoothStatusApple)\\.h$")
 list(FILTER APP_SOURCES EXCLUDE REGEX "Android")
+
+if(NOT GIT2_TARGET)
+    list(FILTER APP_SOURCES EXCLUDE REGEX "GuiThemeDownloader\\.cpp$")
+endif()
 
 set(UWP_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/UWPMain.cpp)
 if(ES_UWP_PDF)
@@ -227,6 +261,9 @@ target_compile_definitions(ES-DE PRIVATE
                            $<$<NOT:$<CONFIG:Debug>>:NDEBUG>)
 if(ES_UWP_PDF)
     target_compile_definitions(ES-DE PRIVATE ES_UWP_PDF)
+endif()
+if(NOT GIT2_TARGET)
+    target_compile_definitions(ES-DE PRIVATE ES_NO_THEME_DOWNLOADER)
 endif()
 
 target_include_directories(ES-DE PRIVATE

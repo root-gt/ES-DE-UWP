@@ -105,13 +105,42 @@ jobs:
         id: vcpkg
         shell: pwsh
         run: |
+          # libgit2 is optional (theme downloader). If it, or a dependency only it needs,
+          # fails to build for UWP, ES-DE is built without the theme downloader.
+          $optional = @("libgit2", "pcre", "http-parser")
           $overlayArgs = @()
           if (Test-Path uwp/vcpkg-ports) { $overlayArgs += "--overlay-ports=$PWD\uwp\vcpkg-ports" }
           if (Test-Path uwp/vcpkg-triplets) { $overlayArgs += "--overlay-triplets=$PWD\uwp\vcpkg-triplets" }
           & "$env:VCPKG_DIR\vcpkg.exe" install --triplet x64-uwp --host-triplet x64-windows `
             --x-manifest-root=uwp --x-install-root=$env:VCPKG_INSTALLED `
-            --allow-unsupported --keep-going @overlayArgs
-          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+            --allow-unsupported --keep-going @overlayArgs 2>&1 | Tee-Object -FilePath vcpkg-install.log
+          $exitCode = $LASTEXITCODE
+          if ($exitCode -eq 0) { exit 0 }
+
+          $failed = Select-String -Path vcpkg-install.log -Pattern '^\s+([a-z0-9-]+)(\[[^\]]*\])?:x64-(uwp|windows)(@\S+)?: (BUILD_FAILED|CASCADED_DUE_TO_MISSING_DEPENDENCIES|POST_BUILD_CHECKS_FAILED|FILE_CONFLICTS|DOWNLOAD_FAILED)' |
+            ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object -Unique
+          Write-Host "Failed ports: $($failed -join ', ')"
+
+          # Collect the build logs (the source trees contain symlinks that break uploads).
+          New-Item -ItemType Directory -Force vcpkg-logs | Out-Null
+          foreach ($port in $failed) {
+            $dir = "$env:VCPKG_DIR\buildtrees\$port"
+            if (-not (Test-Path $dir)) { continue }
+            New-Item -ItemType Directory -Force "vcpkg-logs\$port" | Out-Null
+            Get-ChildItem $dir -Filter *.log -File | Copy-Item -Destination "vcpkg-logs\$port"
+            Get-ChildItem $dir -Recurse -Depth 3 -Include config.log, meson-log.txt, CMakeConfigureLog.yaml -File -ErrorAction SilentlyContinue |
+              ForEach-Object { Copy-Item $_.FullName "vcpkg-logs\$port\$($_.Directory.Name)-$($_.Name)" }
+            foreach ($log in Get-ChildItem "vcpkg-logs\$port" -Filter *-out.log) {
+              Write-Host "::group::$port $($log.Name) (errors)"
+              Select-String -Path $log.FullName -Pattern '(error|fatal|undefined|unresolved)' -CaseSensitive:$false |
+                Select-Object -First 40 | ForEach-Object { Write-Host $_.Line }
+              Write-Host "::endgroup::"
+            }
+          }
+
+          $required = @($failed | Where-Object { $_ -notin $optional })
+          if ($required.Count -gt 0) { throw "vcpkg install failed for: $($required -join ', ')" }
+          Write-Host "::warning::Optional ports failed to build for UWP: $($failed -join ', '). Building without the theme downloader."
 
       - name: Save vcpkg binary cache
         if: always()
@@ -121,13 +150,13 @@ jobs:
           key: vcpkg-x64-uwp-${{ env.VCPKG_REF }}-${{ hashFiles('uwp/vcpkg.json', 'uwp/vcpkg-ports/**', 'uwp/vcpkg-triplets/**') }}-${{ github.run_id }}
 
       - name: Upload vcpkg logs
-        if: failure() && steps.vcpkg.outcome == 'failure'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: vcpkg-logs
           path: |
-            C:\vcpkg-esde\buildtrees\**\*.log
-            C:\vcpkg-esde\buildtrees\**\config.log
+            vcpkg-install.log
+            vcpkg-logs/
           if-no-files-found: ignore
 
       - name: Configure

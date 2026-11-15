@@ -38,7 +38,9 @@
 #include "guis/GuiSystemStatusOptions.h"
 #include "guis/GuiTextEditKeyboardPopup.h"
 #include "guis/GuiTextEditPopup.h"
+#if !defined(ES_NO_THEME_DOWNLOADER)
 #include "guis/GuiThemeDownloader.h"
+#endif
 #include "utils/LocalizationUtil.h"
 #include "utils/PlatformUtil.h"
 
@@ -136,6 +138,7 @@ void GuiMenu::openUIOptions()
 
     auto theme = std::make_shared<OptionListComponent<std::string>>(_("THEME"), false);
 
+#if !defined(ES_NO_THEME_DOWNLOADER)
     ComponentListRow themeDownloaderInputRow;
     themeDownloaderInputRow.elements.clear();
     themeDownloaderInputRow.addElement(std::make_shared<TextComponent>(_("THEME DOWNLOADER"),
@@ -147,6 +150,7 @@ void GuiMenu::openUIOptions()
     themeDownloaderInputRow.makeAcceptInputHandler(
         std::bind(&GuiMenu::openThemeDownloader, this, s));
     s->addRow(themeDownloaderInputRow);
+#endif
 
     // Theme.
     if (!themes.empty()) {
@@ -2532,7 +2536,11 @@ void GuiMenu::openThemeDownloader(GuiSettings* settings)
         }
     };
 
+#if !defined(ES_NO_THEME_DOWNLOADER)
     mWindow->pushGui(new GuiThemeDownloader(updateFunc));
+#else
+    static_cast<void>(updateFunc);
+#endif
 }
 
 void GuiMenu::openSystemStatusOptions()

@@ -1,0 +1,38 @@
+{
+  "name": "freeimage",
+  "version": "3.18.0",
+  "port-version": 27,
+  "description": [
+    "Support library for graphics image formats",
+    "ES-DE UWP overlay: built without the EXR and RAW plugins (OpenEXR and LibRaw don't support UWP)."
+  ],
+  "homepage": "https://sourceforge.net/projects/freeimage/",
+  "license": "GPL-2.0-only OR GPL-3.0-only OR FreeImage",
+  "dependencies": [
+    "imath",
+    "jxrlib",
+    "libjpeg-turbo",
+    "libpng",
+    {
+      "name": "libwebp",
+      "default-features": false,
+      "features": [
+        "libwebpmux"
+      ]
+    },
+    "openjpeg",
+    {
+      "name": "tiff",
+      "default-features": false
+    },
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    },
+    "zlib"
+  ]
+}
