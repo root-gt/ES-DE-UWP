@@ -125,3 +125,6 @@ CPackSourceConfig.cmake
 .vscode/
 .continueignore
 es-de-tests
+
+# vcpkg overlay ports for the UWP build.
+!uwp/vcpkg-ports/**/*.patch
