@@ -29,6 +29,7 @@
 #include "guis/GuiCollectionSystemsOptions.h"
 #include "guis/GuiDetectDevice.h"
 #include "guis/GuiGameImporter.h"
+#include "guis/GuiRomM.h"
 #include "guis/GuiMediaViewerOptions.h"
 #include "guis/GuiMsgBox.h"
 #include "guis/GuiOrphanedDataCleanup.h"
@@ -2272,6 +2273,17 @@ void GuiMenu::openUtilities()
     row.addElement(mMenu.makeArrow(), false);
     row.makeAcceptInputHandler(std::bind([this, gameImporterUpdateFunc] {
         mWindow->pushGui(new GuiGameImporter(_("GAME IMPORTER"), gameImporterUpdateFunc));
+    }));
+    s->addRow(row);
+
+    row.elements.clear();
+    row.addElement(std::make_shared<TextComponent>("ROMM", Font::get(FONT_SIZE_MEDIUM),
+                                                   mMenuColorPrimary),
+                   true);
+    row.addElement(mMenu.makeArrow(), false);
+    row.makeAcceptInputHandler(std::bind([gameImporterUpdateFunc] {
+        // The RomM importer uses the same close and rescan logic as the game importer.
+        GuiRomM::openSettings(gameImporterUpdateFunc);
     }));
     s->addRow(row);
 

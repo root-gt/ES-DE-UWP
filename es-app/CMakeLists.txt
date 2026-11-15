@@ -21,6 +21,7 @@ set(ES_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MiximageGenerator.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PlatformId.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PDFViewer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/RomM.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Screensaver.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SystemData.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UIModeController.h
@@ -39,6 +40,8 @@ set(ES_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiMetaDataEd.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiOfflineGenerator.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiOrphanedDataCleanup.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiRomM.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiRomMProgress.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiScraperMenu.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiScraperMulti.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiScraperSearch.h
@@ -74,6 +77,7 @@ set(ES_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MiximageGenerator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PlatformId.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PDFViewer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/RomM.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Screensaver.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SystemData.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UIModeController.cpp
@@ -92,6 +96,8 @@ set(ES_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiMetaDataEd.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiOfflineGenerator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiOrphanedDataCleanup.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiRomM.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiRomMProgress.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiScraperMenu.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiScraperMulti.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiScraperSearch.cpp
@@ -149,6 +155,33 @@ else()
     add_executable(es-de ${ES_SOURCES} ${ES_HEADERS})
     target_link_libraries(es-de ${COMMON_LIBRARIES} ${CMAKE_DL_LIBS} es-core lunasvg::lunasvg)
     set_target_properties(es-de PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+endif()
+
+# Optional zlib support for extracting ZIP archives downloaded from a RomM server.
+if(IOS OR ANDROID)
+    set(ES_APP_TARGET main)
+elseif(WIN32 OR APPLE)
+    set(ES_APP_TARGET ES-DE)
+else()
+    set(ES_APP_TARGET es-de)
+endif()
+if(TARGET ${ES_APP_TARGET})
+    if(WIN32 AND EXISTS ${PROJECT_SOURCE_DIR}/zlib.lib)
+        target_compile_definitions(${ES_APP_TARGET} PRIVATE ROMM_ZIP_SUPPORT)
+        target_link_libraries(${ES_APP_TARGET} ${PROJECT_SOURCE_DIR}/zlib.lib)
+    else()
+        find_package(ZLIB QUIET)
+        if(ZLIB_FOUND)
+            target_compile_definitions(${ES_APP_TARGET} PRIVATE ROMM_ZIP_SUPPORT)
+            if(ANDROID)
+                target_link_libraries(${ES_APP_TARGET} PRIVATE ZLIB::ZLIB)
+            else()
+                target_link_libraries(${ES_APP_TARGET} ZLIB::ZLIB)
+            endif()
+        else()
+            message(STATUS "zlib not found, RomM ZIP extraction will be disabled")
+        endif()
+    endif()
 endif()
 
 # Setup for installation and package generation.

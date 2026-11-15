@@ -104,6 +104,20 @@ void Settings::setDefaults()
     // Scraper.
     mStringMap["Scraper"] = {"screenscraper", "screenscraper"};
     mStringMap["ScraperUsernameScreenScraper"] = {"", ""};
+
+    // RomM integration.
+    mBoolMap["RomMEnabled"] = {false, false};
+    mStringMap["RomMServerURL"] = {"", ""};
+    mStringMap["RomMAPIToken"] = {"", ""};
+    mStringMap["RomMUsername"] = {"", ""};
+    mStringMap["RomMPassword"] = {"", ""};
+    mBoolMap["RomMDownloadOnLaunch"] = {true, true};
+    mBoolMap["RomMImportMedia"] = {true, true};
+    mBoolMap["RomMImportVideos"] = {false, false};
+    mBoolMap["RomMDeleteArchiveAfterExtraction"] = {true, true};
+    mStringMap["RomMImportPlatforms"] = {"", ""};
+    mStringMap["RomMExtractedExtensions"] = {"", ""};
+    mStringMap["RomMPlatformMappings"] = {"", ""};
     mStringMap["ScraperPasswordScreenScraper"] = {"", ""};
     mBoolMap["ScraperUseAccountScreenScraper"] = {true, true};
 

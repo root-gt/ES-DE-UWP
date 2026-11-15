@@ -31,6 +31,7 @@
 #include "guis/GuiApplicationUpdater.h"
 #include "guis/GuiGameImporter.h"
 #include "guis/GuiMenu.h"
+#include "guis/GuiRomM.h"
 #include "guis/GuiTextEditKeyboardPopup.h"
 #include "guis/GuiTextEditPopup.h"
 #include "utils/LocalizationUtil.h"
@@ -1327,9 +1328,18 @@ void ViewController::update(int deltaTime)
     updateSelf(deltaTime);
 
     if (mGameToLaunch) {
-        launch(mGameToLaunch);
-        mWindow->setGameLaunched(mGameToLaunch);
+        FileData* game {mGameToLaunch};
         mGameToLaunch = nullptr;
+        if (GuiRomM::needsDownload(game)) {
+            // The game is a RomM placeholder, download the actual game file first and
+            // then trigger the launch again.
+            mWindow->setBlockInput(false);
+            GuiRomM::downloadGame(game, [this, game] { triggerGameLaunch(game); });
+        }
+        else {
+            launch(game);
+            mWindow->setGameLaunched(game);
+        }
     }
 }
 
