@@ -24,6 +24,12 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
                         "-DCMAKE_SYSTEM_VERSION=10.0, see uwp/README.md")
 endif()
 
+# Minimum Windows version of the package (TargetDeviceFamily MinVersion). Without this, Visual
+# Studio uses the version of the installed Windows SDK, which excludes older Windows and Xbox
+# OS versions.
+set(CMAKE_VS_WINDOWS_TARGET_PLATFORM_MIN_VERSION "10.0.19041.0" CACHE STRING
+    "Minimum Windows version for the UWP package")
+
 project(ES-DE-UWP LANGUAGES C CXX)
 
 set(ES_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
@@ -337,7 +343,6 @@ set_target_properties(ES-DE PROPERTIES
                       VS_GLOBAL_AppContainerApplication "true"
                       VS_GLOBAL_ApplicationType "Windows Store"
                       VS_GLOBAL_ApplicationTypeRevision "10.0"
-                      VS_GLOBAL_WindowsTargetPlatformMinVersion "10.0.19041.0"
                       VS_GLOBAL_AppxBundle "Never"
                       VS_GLOBAL_AppxPackageSigningEnabled "true"
                       VS_STARTUP_PROJECT ES-DE)

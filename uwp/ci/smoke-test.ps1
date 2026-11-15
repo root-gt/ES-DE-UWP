@@ -134,7 +134,7 @@ try {
     }
 } catch {
     Write-Host "Add-AppxPackage failed: $($_.Exception.Message)"
-    try { Get-AppxLog -All | Select-Object -Last 40 | Format-List | Out-String | Write-Host } catch { }
+    try { Get-AppxLog -All | Where-Object { $_.Level -le 3 } | Select-Object -Last 10 TimeCreated, Message | Format-List | Out-String | Write-Host } catch { }
     throw
 }
 
