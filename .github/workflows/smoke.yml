@@ -43,7 +43,9 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Smoke test
-        shell: pwsh
+        # Windows PowerShell 5.1, the Appx module (Add-AppxPackage) doesn't load in PowerShell 7
+        # on Windows Server.
+        shell: powershell
         run: ./uwp/ci/smoke-test.ps1 -Dist dist -Output smoke
 
       - name: Upload smoke test results

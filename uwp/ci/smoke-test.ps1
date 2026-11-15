@@ -17,7 +17,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Output = (New-Item -ItemType Directory -Force $Output).FullName
-$failures = [System.Collections.Generic.List[string]]::new()
+$failures = New-Object System.Collections.Generic.List[string]
 
 function Save-Screenshot([string]$name) {
     try {
@@ -133,7 +133,8 @@ try {
         Add-AppxPackage -Path $package.FullName
     }
 } catch {
-    Get-AppxLog -All | Select-Object -Last 40 | Format-List | Out-String | Write-Host
+    Write-Host "Add-AppxPackage failed: $($_.Exception.Message)"
+    try { Get-AppxLog -All | Select-Object -Last 40 | Format-List | Out-String | Write-Host } catch { }
     throw
 }
 
@@ -165,7 +166,7 @@ Write-Host "ES-DE home directory: $esHome"
 
 $python = (Get-Command python -ErrorAction SilentlyContinue).Source
 $mock = Start-Process $python -ArgumentList "tests/romm/mock_romm.py", "8099" -PassThru `
-    -RedirectStandardError "$Output\mock_romm.log" -WindowStyle Hidden
+    -RedirectStandardError "$Output\mock_romm.log" -NoNewWindow
 Start-Sleep -Seconds 2
 
 # UWP applications can't connect to localhost unless they are exempted.
